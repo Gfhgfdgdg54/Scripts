@@ -1,733 +1,580 @@
--- ╔══════════════════════════════════════════════════════════════╗
--- ║         CDT All-in-One Controller • Client-Side Script       ║
--- ║           Car Dealership Tycoon | Menu Unificado             ║
--- ║              + Suporte Mobile com Botões Configuráveis       ║
--- ╚══════════════════════════════════════════════════════════════╝
-
-local Players          = game:GetService("Players")
+--[[ CDT • Protected Build • Do not redistribute ]]
+local function _0(k,t)local s=""for i=1,#t do s=s..string.char(t[i]-k)end return s end
+local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService     = game:GetService("TweenService")
-local RunService       = game:GetService("RunService")
-
-local player    = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
--- ─────────────────────────────────────────────────────────────
--- Detecção de Plataforma
--- ─────────────────────────────────────────────────────────────
-local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-
--- ─────────────────────────────────────────────────────────────
--- Paleta de cores
--- ─────────────────────────────────────────────────────────────
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local lcs60 = Players.LocalPlayer
+local lct61 = lcs60:WaitForChild("PlayerGui")
+local lbF39 = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local C = {
-    bg           = Color3.fromRGB(20, 20, 20),
-    panel        = Color3.fromRGB(30, 30, 30),
-    border       = Color3.fromRGB(175, 72, 0),
-    title        = Color3.fromRGB(200, 88, 0),
-    text         = Color3.fromRGB(235, 235, 235),
-    dim          = Color3.fromRGB(145, 145, 145),
-    inputBg      = Color3.fromRGB(14, 14, 14),
-    divider      = Color3.fromRGB(50, 50, 50),
-    on           = Color3.fromRGB(0, 190, 70),
-    off          = Color3.fromRGB(65, 65, 65),
-    apply        = Color3.fromRGB(165, 68, 0),
-    green        = Color3.fromRGB(0, 170, 60),
-    red          = Color3.fromRGB(170, 30, 30),
-    mobileBg     = Color3.fromRGB(20, 20, 20),
-    mobileLabel  = Color3.fromRGB(130, 130, 130),
-    mobileLocked = Color3.fromRGB(0, 190, 70),
+bg = Color3.fromRGB(20, 20, 20),
+panel = Color3.fromRGB(30, 30, 30),
+border = Color3.fromRGB(175, 72, 0),
+title = Color3.fromRGB(200, 88, 0),
+text = Color3.fromRGB(235, 235, 235),
+dim = Color3.fromRGB(145, 145, 145),
+inputBg = Color3.fromRGB(14, 14, 14),
+divider = Color3.fromRGB(50, 50, 50),
+on = Color3.fromRGB(0, 190, 70),
+off = Color3.fromRGB(65, 65, 65),
+apply = Color3.fromRGB(165, 68, 0),
+green = Color3.fromRGB(0, 170, 60),
+red = Color3.fromRGB(170, 30, 30),
+mobileBg = Color3.fromRGB(20, 20, 20),
+mobileLabel = Color3.fromRGB(130, 130, 130),
+mobileLocked = Color3.fromRGB(0, 190, 70),
 }
-
--- ─────────────────────────────────────────────────────────────
--- Estado global unificado
--- ─────────────────────────────────────────────────────────────
-local currentCar    = nil
-local connections   = {}
-local sectionRefs   = {}
-
-local driftState     = { front = { enabled = false }, rear = { enabled = false } }
-local driftOriginals = { front = nil, rear = nil }
-local motorState     = { enabled = false, maxVel = 100, maxTorque = 50000, currentDir = "Parar" }
-local steerState     = { enabled = false, autoAlign = false, maxAngle = 0.4, speed = 0.5, currentSteer = 0, isA = false, isD = false }
-
--- ─────────────────────────────────────────────────────────────
--- Estado Mobile
--- ─────────────────────────────────────────────────────────────
-local mobileState = {
-    locked  = false,  -- false = botões arrastáveis | true = botões ativam ações
-    btnSize = 56,
-    btnRefs = {},
+local lbc1c = nil
+local lT13 = {}
+local lcF6d = {}
+local lbk24 = { front = { enabled = false }, rear = { enabled = false } }
+local lbj23 = { front = nil, rear = nil }
+local lci56 = { enabled = false, maxVel = 100, maxTorque = 50000, currentDir = _0(31,{111,128,145,128,145}) }
+local lcQ78 = { enabled = false, autoAlign = false, maxAngle = 0.4, speed = 0.5, currentSteer = 0, isA = false, isD = false }
+local lcf53 = {
+locked = false,
+btnSize = 56,
+btnRefs = {},
 }
-
--- ─────────────────────────────────────────────────────────────
--- Lógica Central
--- ─────────────────────────────────────────────────────────────
-local function findPlayerCar()
-    local folder = workspace:FindFirstChild("Cars")
-    if not folder then return nil end
-    for _, car in ipairs(folder:GetChildren()) do
-        local stats = car:FindFirstChild("Stats")
-        if stats then
-            local owner = stats:FindFirstChild("Owner")
-            if owner and (owner.Value == player.Name or owner.Value == player or owner.Value == player.UserId) then
-                return car
-            end
-        end
-    end
-    return nil
+local function lbp29()
+local lbs2c = workspace:FindFirstChild("Cars")
+if not lbs2c then return nil end
+for _, car in ipairs(lbs2c:GetChildren()) do
+local lcM74 = car:FindFirstChild("Stats")
+if lcM74 then
+local lcp5d = lcM74:FindFirstChild("Owner")
+if lcp5d and (lcp5d.Value == lcs60.Name or lcp5d.Value == lcs60 or lcp5d.Value == lcs60.UserId) then
+return car
 end
-
-local function isPlayerInCar(car)
-    if not car or not player.Character then return false end
-    local humanoid = player.Character:FindFirstChild("Humanoid")
-    if not humanoid or not humanoid.SeatPart then return false end
-    return humanoid.SeatPart:IsDescendantOf(car)
 end
-
-local function parseNum(str)
-    return tonumber((str:gsub(",", ".")))
 end
-
--- ─────────────────────────────────────────────────────────────
--- 1. LÓGICA DO DRIFT
--- ─────────────────────────────────────────────────────────────
-local WHEEL_PREFIXES = { front = { "FL", "FR" }, rear = { "RL", "RR" } }
-
-local function getWheels(car, group)
-    local result = {}
-    for _, obj in ipairs(car:GetChildren()) do
-        for _, pfx in ipairs(WHEEL_PREFIXES[group]) do
-            if obj.Name == pfx or obj.Name:match("^" .. pfx .. "_%d+$") then
-                local w = obj:FindFirstChild("Wheel")
-                if w and w:IsA("BasePart") then table.insert(result, w) end
-                local sw = obj:FindFirstChild("SecondaryWheel")
-                if sw and sw:IsA("BasePart") then table.insert(result, sw) end
-            end
-        end
-    end
-    return result
+return nil
 end
-
-local function readPhysics(wheel)
-    local p = wheel.CustomPhysicalProperties
-    if typeof(p) == "PhysicalProperties" then
-        return { density = p.Density, friction = p.Friction, elasticity = p.Elasticity, frictionWeight = p.FrictionWeight, elasticityWeight = p.ElasticityWeight }
-    end
-    return { density = 0.7, friction = 0.3, elasticity = 0.5, frictionWeight = 1.0, elasticityWeight = 1.0 }
+local function lbH3b(car)
+if not car or not lcs60.Character then return false end
+local lbC36 = lcs60.Character:FindFirstChild("Humanoid")
+if not lbC36 or not lbC36.SeatPart then return false end
+return lbC36.SeatPart:IsDescendantOf(car)
 end
-
-local function applyDrift(group, friction, frictionWeight)
-    if not currentCar then return false end
-    local wheels = getWheels(currentCar, group)
-    if #wheels == 0 then return false end
-    if not driftOriginals[group] then driftOriginals[group] = readPhysics(wheels[1]) end
-    local base = driftOriginals[group]
-    for _, w in ipairs(wheels) do
-        w.CustomPhysicalProperties = PhysicalProperties.new(base.density, friction, base.elasticity, frictionWeight, base.elasticityWeight)
-    end
-    return true
+local function lcr5f(str)
+return tonumber((str:gsub(",", ".")))
 end
-
-local function revertDrift(group)
-    if not currentCar or not driftOriginals[group] then return end
-    local wheels = getWheels(currentCar, group)
-    local o = driftOriginals[group]
-    for _, w in ipairs(wheels) do
-        w.CustomPhysicalProperties = PhysicalProperties.new(o.density, o.friction, o.elasticity, o.frictionWeight, o.elasticityWeight)
-    end
+local lA0 = { front = { "FL", "FR" }, rear = { "RL", "RR" } }
+local function lbA34(car, group)
+local lcy66 = {}
+for _, obj in ipairs(car:GetChildren()) do
+for _, pfx in ipairs(lA0[group]) do
+if obj.Name == pfx or obj.Name:match("^" .. pfx .. "_%d+$") then
+local w = obj:FindFirstChild("Wheel")
+if w and w:IsA("BasePart") then table.insert(lcy66, w) end
+local lcS7a = obj:FindFirstChild("SecondaryWheel")
+if lcS7a and lcS7a:IsA("BasePart") then table.insert(lcy66, lcS7a) end
 end
-
--- ─────────────────────────────────────────────────────────────
--- 2. LÓGICA DO MOTOR
--- ─────────────────────────────────────────────────────────────
-local function obterConstraints()
-    if not currentCar then return nil end
-    local constraints = currentCar:FindFirstChild("Constraints")
-    if constraints then
-        for _, item in pairs(constraints:GetChildren()) do
-            if item.Name == "Front" or item.Name == "Rear" then item.Name = "Rodas" end
-        end
-        return constraints
-    end
-    return nil
 end
-
-local function aplicarMotor(direcao)
-    if not motorState.enabled then return end
-    local constraints = obterConstraints()
-    if not constraints then return end
-    local velocidadeAlvo = 0
-    if direcao == "Frente" then velocidadeAlvo = -math.abs(motorState.maxVel)
-    elseif direcao == "Re"  then velocidadeAlvo =  math.abs(motorState.maxVel) end
-    if direcao ~= "Parar" and not isPlayerInCar(currentCar) then velocidadeAlvo = 0 end
-    for _, motor in pairs(constraints:GetChildren()) do
-        if motor.Name == "Rodas" and (motor:IsA("CylindricalConstraint") or motor:IsA("HingeConstraint")) then
-            motor.ActuatorType    = Enum.ActuatorType.Motor
-            motor.MotorMaxTorque  = motorState.maxTorque
-            motor.AngularVelocity = velocidadeAlvo
-        end
-    end
 end
-
--- ─────────────────────────────────────────────────────────────
--- GUI Helpers
--- ─────────────────────────────────────────────────────────────
-local function uiCorner(parent, r)
-    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 6); c.Parent = parent
+return lcy66
 end
-
-local function uiStroke(parent, color, thick)
-    local s = Instance.new("UIStroke"); s.Color = color or C.border; s.Thickness = thick or 1.5; s.Parent = parent; return s
+local function lcx65(wheel)
+local p = wheel.CustomPhysicalProperties
+if typeof(p) == "PhysicalProperties" then
+return { density = p.Density, friction = p.Friction, elasticity = p.Elasticity, frictionWeight = p.FrictionWeight, elasticityWeight = p.ElasticityWeight }
 end
-
--- ─────────────────────────────────────────────────────────────
--- makeDraggable — Mouse + Touch | continua arrastando mesmo fora do handle
--- Mouse: MouseButton1 e MouseMovement são InputObjects DIFERENTES → trata separado
--- Touch: mesmo InputObject do Began até o Ended
--- ─────────────────────────────────────────────────────────────
-local function makeDraggable(frame, handle)
-    handle = handle or frame
-    local dragging    = false
-    local isMouse     = false
-    local dragStart   = nil
-    local startPos    = nil
-    local activeInput = nil  -- só usado no Touch
-
-    local function beginDrag(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging    = true
-            isMouse     = true
-            activeInput = nil
-            dragStart   = Vector2.new(i.Position.X, i.Position.Y)
-            startPos    = frame.Position
-        elseif i.UserInputType == Enum.UserInputType.Touch then
-            dragging    = true
-            isMouse     = false
-            activeInput = i
-            dragStart   = Vector2.new(i.Position.X, i.Position.Y)
-            startPos    = frame.Position
-        end
-    end
-
-    -- Conecta InputBegan no handle e em todos os filhos (evita input roubado)
-    local function connectBegan(obj)
-        obj.InputBegan:Connect(beginDrag)
-        for _, child in ipairs(obj:GetChildren()) do
-            if child:IsA("GuiObject") then
-                connectBegan(child)
-            end
-        end
-    end
-    connectBegan(handle)
-
-    -- InputChanged GLOBAL
-    local c1 = UserInputService.InputChanged:Connect(function(i)
-        if not dragging then return end
-        if isMouse then
-            -- Mouse: aceita qualquer MouseMovement
-            if i.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-        else
-            -- Touch: precisa ser o mesmo InputObject
-            if i ~= activeInput then return end
-        end
-        local d = Vector2.new(i.Position.X, i.Position.Y) - dragStart
-        frame.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + d.X,
-            startPos.Y.Scale, startPos.Y.Offset + d.Y
-        )
-    end)
-    table.insert(connections, c1)
-
-    -- InputEnded GLOBAL: só para quando soltar
-    local c2 = UserInputService.InputEnded:Connect(function(i)
-        if not dragging then return end
-        if isMouse then
-            if i.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        else
-            if i == activeInput then
-                dragging    = false
-                activeInput = nil
-            end
-        end
-    end)
-    table.insert(connections, c2)
+return { density = 0.7, friction = 0.3, elasticity = 0.5, frictionWeight = 1.0, elasticityWeight = 1.0 }
 end
-
--- ─────────────────────────────────────────────────────────────
--- Construção da GUI
--- ─────────────────────────────────────────────────────────────
-local old = playerGui:FindFirstChild("CDTController")
-if old then old:Destroy() end
-
-local sg = Instance.new("ScreenGui")
-sg.Name = "CDTController"; sg.ResetOnSpawn = false; sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; sg.Parent = playerGui
-sg:GetPropertyChangedSignal("Parent"):Connect(function()
-    if not sg.Parent then for _, c in ipairs(connections) do c:Disconnect() end end
+local function lF5(group, friction, frictionWeight)
+if not lbc1c then return false end
+local ldl8d = lbA34(lbc1c, group)
+if #ldl8d == 0 then return false end
+if not lbj23[group] then lbj23[group] = lcx65(ldl8d[1]) end
+local lI8 = lbj23[group]
+for _, w in ipairs(ldl8d) do
+w.CustomPhysicalProperties = PhysicalProperties.new(lI8.density, friction, lI8.elasticity, frictionWeight, lI8.elasticityWeight)
+end
+return true
+end
+local function lcz67(group)
+if not lbc1c or not lbj23[group] then return end
+local ldl8d = lbA34(lbc1c, group)
+local o = lbj23[group]
+for _, w in ipairs(ldl8d) do
+w.CustomPhysicalProperties = PhysicalProperties.new(o.density, o.friction, o.elasticity, o.frictionWeight, o.elasticityWeight)
+end
+end
+local function lcl59()
+if not lbc1c then return nil end
+local lU14 = lbc1c:FindFirstChild("Constraints")
+if lU14 then
+for _, item in pairs(lU14:GetChildren()) do
+if item.Name == _0(46,{116,160,157,156,162}) or item.Name == _0(44,{126,145,141,158}) then item.Name = _0(47,{129,158,147,144,162}) end
+end
+return lU14
+end
+return nil
+end
+local function lD3(direcao)
+if not lci56.enabled then return end
+local lU14 = lcl59()
+if not lU14 then return end
+local ldj8b = 0
+if direcao == _0(58,{128,172,159,168,174,159}) then ldj8b = -math.abs(lci56.maxVel)
+elseif direcao == _0(59,{141,160}) then ldj8b = math.abs(lci56.maxVel) end
+if direcao ~= _0(31,{111,128,145,128,145}) and not lbH3b(lbc1c) then ldj8b = 0 end
+for _, motor in pairs(lU14:GetChildren()) do
+if motor.Name == _0(47,{129,158,147,144,162}) and (motor:IsA("CylindricalConstraint") or motor:IsA("HingeConstraint")) then
+motor.ActuatorType = Enum.ActuatorType.Motor
+motor.MotorMaxTorque = lci56.maxTorque
+motor.AngularVelocity = ldj8b
+end
+end
+end
+local function ldb83(parent, r)
+local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 6); c.Parent = parent
+end
+local function ldc84(parent, color, thick)
+local s = Instance.new("UIStroke"); s.Color = color or C.border; s.Thickness = thick or 1.5; s.Parent = parent; return s
+end
+local function lbU48(lbu2e, handle)
+handle = handle or lbu2e
+local lbg20 = false
+local lbG3a = false
+local lbf1f = nil
+local lcL73 = nil
+local lB1 = nil
+local function lJ9(i)
+if i.UserInputType == Enum.UserInputType.MouseButton1 then
+lbg20 = true
+lbG3a = true
+lB1 = nil
+lbf1f = Vector2.new(i.Position.X, i.Position.Y)
+lcL73 = lbu2e.Position
+elseif i.UserInputType == Enum.UserInputType.Touch then
+lbg20 = true
+lbG3a = false
+lB1 = i
+lbf1f = Vector2.new(i.Position.X, i.Position.Y)
+lcL73 = lbu2e.Position
+end
+end
+local function lS12(obj)
+obj.InputBegan:Connect(lJ9)
+for _, child in ipairs(obj:GetChildren()) do
+if child:IsA("GuiObject") then
+lS12(child)
+end
+end
+end
+lS12(handle)
+local lNd = UserInputService.InputChanged:Connect(function(i)
+if not lbg20 then return end
+if lbG3a then
+if i.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+else
+if i ~= lB1 then return end
+end
+local d = Vector2.new(i.Position.X, i.Position.Y) - lbf1f
+lbu2e.Position = UDim2.new(
+lcL73.X.Scale, lcL73.X.Offset + d.X,
+lcL73.Y.Scale, lcL73.Y.Offset + d.Y
+)
 end)
-
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0, 94, 0, 24); toggleBtn.Position = UDim2.new(0, 14, 0.5, -12)
-toggleBtn.BackgroundColor3 = C.bg; toggleBtn.Text = "⚙  Painel"
-toggleBtn.Font = Enum.Font.GothamBold; toggleBtn.TextSize = 11; toggleBtn.TextColor3 = C.text
-toggleBtn.Parent = sg; uiCorner(toggleBtn, 8); uiStroke(toggleBtn, C.border, 1.5)
-makeDraggable(toggleBtn)
-
-local menu = Instance.new("Frame")
-menu.Size = UDim2.new(0, 190, 0, 0); menu.Position = UDim2.new(0, 120, 0.5, -12)
-menu.BackgroundColor3 = C.bg; menu.AutomaticSize = Enum.AutomaticSize.Y; menu.Visible = false; menu.Parent = sg
-uiCorner(menu, 8); uiStroke(menu, C.border, 1.5)
-
+table.insert(lT13, lNd)
+local lOe = UserInputService.InputEnded:Connect(function(i)
+if not lbg20 then return end
+if lbG3a then
+if i.UserInputType == Enum.UserInputType.MouseButton1 then
+lbg20 = false
+end
+else
+if i == lB1 then
+lbg20 = false
+lB1 = nil
+end
+end
+end)
+table.insert(lT13, lOe)
+end
+local lco5c = lct61:FindFirstChild(_0(36,{103,104,120,103,147,146,152,150,147,144,144,137,150}))
+if lco5c then lco5c:Destroy() end
+local lcH6f = Instance.new("ScreenGui")
+lcH6f.Name = _0(36,{103,104,120,103,147,146,152,150,147,144,144,137,150}); lcH6f.ResetOnSpawn = false; lcH6f.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; lcH6f.Parent = lct61
+lcH6f:GetPropertyChangedSignal("Parent"):Connect(function()
+if not lcH6f.Parent then for _, c in ipairs(lT13) do c:Disconnect() end end
+end)
+local lcZ81 = Instance.new("TextButton")
+lcZ81.Size = UDim2.new(0, 94, 0, 24); lcZ81.Position = UDim2.new(0, 14, 0.5, -12)
+lcZ81.BackgroundColor3 = C.bg; lcZ81.Text = "⚙ Painel"
+lcZ81.Font = Enum.Font.GothamBold; lcZ81.TextSize = 11; lcZ81.TextColor3 = C.text
+lcZ81.Parent = lcH6f; ldb83(lcZ81, 8); ldc84(lcZ81, C.border, 1.5)
+lbU48(lcZ81)
+local lcb4f = Instance.new("Frame")
+lcb4f.Size = UDim2.new(0, 190, 0, 0); lcb4f.Position = UDim2.new(0, 120, 0.5, -12)
+lcb4f.BackgroundColor3 = C.bg; lcb4f.AutomaticSize = Enum.AutomaticSize.Y; lcb4f.Visible = false; lcb4f.Parent = lcH6f
+ldb83(lcb4f, 8); ldc84(lcb4f, C.border, 1.5)
 Instance.new("UIListLayout").SortOrder = Enum.SortOrder.LayoutOrder
-local menuList = Instance.new("UIListLayout"); menuList.SortOrder = Enum.SortOrder.LayoutOrder; menuList.Parent = menu
-
-local titleBar = Instance.new("Frame"); titleBar.Size = UDim2.new(1, 0, 0, 24); titleBar.BackgroundColor3 = C.panel; titleBar.LayoutOrder = 1; titleBar.Parent = menu; uiCorner(titleBar, 8)
-local titleFix = Instance.new("Frame"); titleFix.Size = UDim2.new(1, 0, 0.5, 0); titleFix.Position = UDim2.new(0, 0, 0.5, 0); titleFix.BackgroundColor3 = C.panel; titleFix.BorderSizePixel = 0; titleFix.Active = false; titleFix.Parent = titleBar
-local titleLabel = Instance.new("TextLabel"); titleLabel.BackgroundTransparency = 1; titleLabel.Size = UDim2.new(1, -8, 1, 0); titleLabel.Position = UDim2.new(0, 8, 0, 0); titleLabel.Text = "🚗  Multi Controller"; titleLabel.Font = Enum.Font.GothamBold; titleLabel.TextSize = 11; titleLabel.TextColor3 = C.title; titleLabel.TextXAlignment = Enum.TextXAlignment.Left; titleLabel.Active = false; titleLabel.Parent = titleBar
-makeDraggable(menu, titleBar)
-
-local contentWrap = Instance.new("Frame"); contentWrap.Size = UDim2.new(1, 0, 0, 0); contentWrap.BackgroundTransparency = 1; contentWrap.AutomaticSize = Enum.AutomaticSize.Y; contentWrap.LayoutOrder = 2; contentWrap.Parent = menu
-local contentPad = Instance.new("UIPadding"); contentPad.PaddingTop = UDim.new(0, 5); contentPad.PaddingBottom = UDim.new(0, 6); contentPad.PaddingLeft = UDim.new(0, 6); contentPad.PaddingRight = UDim.new(0, 6); contentPad.Parent = contentWrap
-local contentInner = Instance.new("Frame"); contentInner.Size = UDim2.new(1, 0, 0, 0); contentInner.BackgroundTransparency = 1; contentInner.AutomaticSize = Enum.AutomaticSize.Y; contentInner.Parent = contentWrap
-local contentList = Instance.new("UIListLayout"); contentList.SortOrder = Enum.SortOrder.LayoutOrder; contentList.Padding = UDim.new(0, 5); contentList.Parent = contentInner
-
--- Factory de seções
-local function createSection(name, titleTxt, order)
-    local sec = Instance.new("Frame"); sec.BackgroundColor3 = C.panel; sec.AutomaticSize = Enum.AutomaticSize.Y; sec.Size = UDim2.new(1, 0, 0, 0); sec.LayoutOrder = order; sec.Parent = contentInner
-    uiCorner(sec, 6); uiStroke(sec, C.divider, 1)
-    local pad = Instance.new("UIPadding"); pad.PaddingTop = UDim.new(0, 6); pad.PaddingBottom = UDim.new(0, 6); pad.PaddingLeft = UDim.new(0, 7); pad.PaddingRight = UDim.new(0, 7); pad.Parent = sec
-    local secList = Instance.new("UIListLayout"); secList.SortOrder = Enum.SortOrder.LayoutOrder; secList.Padding = UDim.new(0, 5); secList.Parent = sec
-
-    local header = Instance.new("Frame"); header.Size = UDim2.new(1, 0, 0, 16); header.BackgroundTransparency = 1; header.LayoutOrder = 1; header.Parent = sec
-    local secLabel = Instance.new("TextLabel"); secLabel.BackgroundTransparency = 1; secLabel.Size = UDim2.new(0.65, 0, 1, 0); secLabel.Text = titleTxt; secLabel.Font = Enum.Font.GothamBold; secLabel.TextSize = 11; secLabel.TextColor3 = C.border; secLabel.TextXAlignment = Enum.TextXAlignment.Left; secLabel.Parent = header
-    local togBtn = Instance.new("TextButton"); togBtn.Size = UDim2.new(0, 34, 0, 14); togBtn.Position = UDim2.new(1, -34, 0.5, -7); togBtn.BackgroundColor3 = C.off; togBtn.Text = "OFF"; togBtn.Font = Enum.Font.GothamBold; togBtn.TextSize = 9; togBtn.TextColor3 = C.text; togBtn.AutoButtonColor = false; togBtn.Parent = header
-    uiCorner(togBtn, 10)
-
-    local function makeRow(lOrder, lblTxt, defaultVal)
-        local row = Instance.new("Frame"); row.Size = UDim2.new(1, 0, 0, 18); row.BackgroundTransparency = 1; row.LayoutOrder = lOrder; row.Parent = sec
-        local lbl = Instance.new("TextLabel"); lbl.BackgroundTransparency = 1; lbl.Size = UDim2.new(0.58, 0, 1, 0); lbl.Text = lblTxt; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 10; lbl.TextColor3 = C.dim; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = row
-        local box = Instance.new("TextBox"); box.Size = UDim2.new(0.4, 0, 0.83, 0); box.Position = UDim2.new(0.59, 0, 0.085, 0); box.BackgroundColor3 = C.inputBg; box.Text = defaultVal; box.Font = Enum.Font.GothamMedium; box.TextSize = 10; box.TextColor3 = C.text; box.ClearTextOnFocus = true; box.Parent = row
-        uiCorner(box, 4); uiStroke(box, C.border, 1)
-        return box
-    end
-
-    local function makeSubToggle(lOrder, lblTxt, defaultState, callback)
-        local row = Instance.new("Frame"); row.Size = UDim2.new(1, 0, 0, 18); row.BackgroundTransparency = 1; row.LayoutOrder = lOrder; row.Parent = sec
-        local lbl = Instance.new("TextLabel"); lbl.BackgroundTransparency = 1; lbl.Size = UDim2.new(0.58, 0, 1, 0); lbl.Text = lblTxt; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 10; lbl.TextColor3 = C.dim; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = row
-        local btn = Instance.new("TextButton"); btn.Size = UDim2.new(0.4, 0, 0.83, 0); btn.Position = UDim2.new(0.59, 0, 0.085, 0); btn.BackgroundColor3 = defaultState and C.on or C.off; btn.Text = defaultState and "ON" or "OFF"; btn.Font = Enum.Font.GothamBold; btn.TextSize = 9; btn.TextColor3 = C.text; btn.Parent = row
-        uiCorner(btn, 4)
-        local cur = defaultState
-        btn.MouseButton1Click:Connect(function()
-            cur = not cur; btn.Text = cur and "ON" or "OFF"
-            TweenService:Create(btn, TweenInfo.new(0.2), { BackgroundColor3 = cur and C.on or C.off }):Play()
-            if callback then callback(cur) end
-        end)
-    end
-
-    local applyBtn = Instance.new("TextButton"); applyBtn.Size = UDim2.new(1, 0, 0, 16); applyBtn.BackgroundColor3 = C.apply; applyBtn.Text = "Aplicar"; applyBtn.Font = Enum.Font.GothamBold; applyBtn.TextSize = 10; applyBtn.TextColor3 = C.text; applyBtn.LayoutOrder = 10; applyBtn.Parent = sec; uiCorner(applyBtn, 4)
-    local function flash(color)
-        TweenService:Create(applyBtn, TweenInfo.new(0.1), { BackgroundColor3 = color }):Play()
-        task.delay(0.4, function() TweenService:Create(applyBtn, TweenInfo.new(0.2), { BackgroundColor3 = C.apply }):Play() end)
-    end
-
-    return sec, togBtn, makeRow, makeSubToggle, applyBtn, flash
+local lcc50 = Instance.new("UIListLayout"); lcc50.SortOrder = Enum.SortOrder.LayoutOrder; lcc50.Parent = lcb4f
+local lcV7d = Instance.new("Frame"); lcV7d.Size = UDim2.new(1, 0, 0, 24); lcV7d.BackgroundColor3 = C.panel; lcV7d.LayoutOrder = 1; lcV7d.Parent = lcb4f; ldb83(lcV7d, 8)
+local lcW7e = Instance.new("Frame"); lcW7e.Size = UDim2.new(1, 0, 0.5, 0); lcW7e.Position = UDim2.new(0, 0, 0.5, 0); lcW7e.BackgroundColor3 = C.panel; lcW7e.BorderSizePixel = 0; lcW7e.Active = false; lcW7e.Parent = lcV7d
+local lcX7f = Instance.new("TextLabel"); lcX7f.BackgroundTransparency = 1; lcX7f.Size = UDim2.new(1, -8, 1, 0); lcX7f.Position = UDim2.new(0, 8, 0, 0); lcX7f.Text = "🚗 Multi Controller"; lcX7f.Font = Enum.Font.GothamBold; lcX7f.TextSize = 11; lcX7f.TextColor3 = C.title; lcX7f.TextXAlignment = Enum.TextXAlignment.Left; lcX7f.Active = false; lcX7f.Parent = lcV7d
+lbU48(lcb4f, lcV7d)
+local lY18 = Instance.new("Frame"); lY18.Size = UDim2.new(1, 0, 0, 0); lY18.BackgroundTransparency = 1; lY18.AutomaticSize = Enum.AutomaticSize.Y; lY18.LayoutOrder = 2; lY18.Parent = lcb4f
+local lX17 = Instance.new("UIPadding"); lX17.PaddingTop = UDim.new(0, 5); lX17.PaddingBottom = UDim.new(0, 6); lX17.PaddingLeft = UDim.new(0, 6); lX17.PaddingRight = UDim.new(0, 6); lX17.Parent = lY18
+local lV15 = Instance.new("Frame"); lV15.Size = UDim2.new(1, 0, 0, 0); lV15.BackgroundTransparency = 1; lV15.AutomaticSize = Enum.AutomaticSize.Y; lV15.Parent = lY18
+local lW16 = Instance.new("UIListLayout"); lW16.SortOrder = Enum.SortOrder.LayoutOrder; lW16.Padding = UDim.new(0, 5); lW16.Parent = lV15
+local function lba1a(name, titleTxt, order)
+local lcC6a = Instance.new("Frame"); lcC6a.BackgroundColor3 = C.panel; lcC6a.AutomaticSize = Enum.AutomaticSize.Y; lcC6a.Size = UDim2.new(1, 0, 0, 0); lcC6a.LayoutOrder = order; lcC6a.Parent = lV15
+ldb83(lcC6a, 6); ldc84(lcC6a, C.divider, 1)
+local lcq5e = Instance.new("UIPadding"); lcq5e.PaddingTop = UDim.new(0, 6); lcq5e.PaddingBottom = UDim.new(0, 6); lcq5e.PaddingLeft = UDim.new(0, 7); lcq5e.PaddingRight = UDim.new(0, 7); lcq5e.Parent = lcC6a
+local lcE6c = Instance.new("UIListLayout"); lcE6c.SortOrder = Enum.SortOrder.LayoutOrder; lcE6c.Padding = UDim.new(0, 5); lcE6c.Parent = lcC6a
+local lbB35 = Instance.new("Frame"); lbB35.Size = UDim2.new(1, 0, 0, 16); lbB35.BackgroundTransparency = 1; lbB35.LayoutOrder = 1; lbB35.Parent = lcC6a
+local lcD6b = Instance.new("TextLabel"); lcD6b.BackgroundTransparency = 1; lcD6b.Size = UDim2.new(0.65, 0, 1, 0); lcD6b.Text = titleTxt; lcD6b.Font = Enum.Font.GothamBold; lcD6b.TextSize = 11; lcD6b.TextColor3 = C.border; lcD6b.TextXAlignment = Enum.TextXAlignment.Left; lcD6b.Parent = lbB35
+local lcY80 = Instance.new("TextButton"); lcY80.Size = UDim2.new(0, 34, 0, 14); lcY80.Position = UDim2.new(1, -34, 0.5, -7); lcY80.BackgroundColor3 = C.off; lcY80.Text = _0(16,{95,86,86}); lcY80.Font = Enum.Font.GothamBold; lcY80.TextSize = 9; lcY80.TextColor3 = C.text; lcY80.AutoButtonColor = false; lcY80.Parent = lbB35
+ldb83(lcY80, 10)
+local function lbX4b(lOrder, lblTxt, defaultVal)
+local lcB69 = Instance.new("Frame"); lcB69.Size = UDim2.new(1, 0, 0, 18); lcB69.BackgroundTransparency = 1; lcB69.LayoutOrder = lOrder; lcB69.Parent = lcC6a
+local lbJ3d = Instance.new("TextLabel"); lbJ3d.BackgroundTransparency = 1; lbJ3d.Size = UDim2.new(0.58, 0, 1, 0); lbJ3d.Text = lblTxt; lbJ3d.Font = Enum.Font.Gotham; lbJ3d.TextSize = 10; lbJ3d.TextColor3 = C.dim; lbJ3d.TextXAlignment = Enum.TextXAlignment.Left; lbJ3d.Parent = lcB69
+local lLb = Instance.new("TextBox"); lLb.Size = UDim2.new(0.4, 0, 0.83, 0); lLb.Position = UDim2.new(0.59, 0, 0.085, 0); lLb.BackgroundColor3 = C.inputBg; lLb.Text = defaultVal; lLb.Font = Enum.Font.GothamMedium; lLb.TextSize = 10; lLb.TextColor3 = C.text; lLb.ClearTextOnFocus = true; lLb.Parent = lcB69
+ldb83(lLb, 4); ldc84(lLb, C.border, 1)
+return lLb
 end
-
--- ═══════════════════════════════════════════════════════════
--- SEÇÃO: DRIFT
--- ═══════════════════════════════════════════════════════════
-local _, driftTog, makeDriftRow, _, driftApply, driftFlash = createSection("Drift", "💨  Drift Config", 1)
-local frictionBox = makeDriftRow(2, "Friction (F/R)", "0.30")
-local fwBox       = makeDriftRow(3, "Frict. Weight",  "5")
-
-local function updateDriftToggle(val)
-    driftState.front.enabled, driftState.rear.enabled = val, val
-    driftTog.Text = val and "ON" or "OFF"
-    TweenService:Create(driftTog, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
+local function lca4e(lOrder, lblTxt, defaultState, callback)
+local lcB69 = Instance.new("Frame"); lcB69.Size = UDim2.new(1, 0, 0, 18); lcB69.BackgroundTransparency = 1; lcB69.LayoutOrder = lOrder; lcB69.Parent = lcC6a
+local lbJ3d = Instance.new("TextLabel"); lbJ3d.BackgroundTransparency = 1; lbJ3d.Size = UDim2.new(0.58, 0, 1, 0); lbJ3d.Text = lblTxt; lbJ3d.Font = Enum.Font.Gotham; lbJ3d.TextSize = 10; lbJ3d.TextColor3 = C.dim; lbJ3d.TextXAlignment = Enum.TextXAlignment.Left; lbJ3d.Parent = lcB69
+local lMc = Instance.new("TextButton"); lMc.Size = UDim2.new(0.4, 0, 0.83, 0); lMc.Position = UDim2.new(0.59, 0, 0.085, 0); lMc.BackgroundColor3 = defaultState and C.on or C.off; lMc.Text = defaultState and _0(55,{134,133}) or _0(16,{95,86,86}); lMc.Font = Enum.Font.GothamBold; lMc.TextSize = 9; lMc.TextColor3 = C.text; lMc.Parent = lcB69
+ldb83(lMc, 4)
+local lbb1b = defaultState
+lMc.MouseButton1Click:Connect(function()
+lbb1b = not lbb1b; lMc.Text = lbb1b and _0(55,{134,133}) or _0(16,{95,86,86})
+TweenService:Create(lMc, TweenInfo.new(0.2), { BackgroundColor3 = lbb1b and C.on or C.off }):Play()
+if callback then callback(lbb1b) end
+end)
 end
-
-driftTog.MouseButton1Click:Connect(function()
-    local newVal = not driftState.front.enabled
-    updateDriftToggle(newVal)
-    if newVal then
-        local f, fw = parseNum(frictionBox.Text), parseNum(fwBox.Text)
-        if f and fw then applyDrift("front", f, fw); applyDrift("rear", f, fw) end
-    else
-        revertDrift("front"); revertDrift("rear")
-    end
-end)
-
-driftApply.MouseButton1Click:Connect(function()
-    local f, fw = parseNum(frictionBox.Text), parseNum(fwBox.Text)
-    if not f or not fw or not currentCar then driftFlash(C.red) return end
-    if not driftState.front.enabled then updateDriftToggle(true) end
-    local ok1, ok2 = applyDrift("front", f, fw), applyDrift("rear", f, fw)
-    driftFlash((ok1 and ok2) and C.green or C.red)
-end)
-sectionRefs.drift = { setToggle = updateDriftToggle }
-
--- ═══════════════════════════════════════════════════════════
--- SEÇÃO: MOTOR
--- ═══════════════════════════════════════════════════════════
-local _, motorTog, makeMotorRow, _, motorApply, motorFlash = createSection("Motor", "⚙️  Motor (W/S)", 2)
-local velBox    = makeMotorRow(2, "Velocidade",     "160")
-local torqueBox = makeMotorRow(3, "Força (Torque)", "7000")
-
-local function updateMotorToggle(val)
-    motorState.enabled = val
-    motorTog.Text = val and "ON" or "OFF"
-    TweenService:Create(motorTog, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
+local lE4 = Instance.new("TextButton"); lE4.Size = UDim2.new(1, 0, 0, 16); lE4.BackgroundColor3 = C.apply; lE4.Text = _0(41,{106,153,149,146,140,138,155}); lE4.Font = Enum.Font.GothamBold; lE4.TextSize = 10; lE4.TextColor3 = C.text; lE4.LayoutOrder = 10; lE4.Parent = lcC6a; ldb83(lE4, 4)
+local function lbq2a(color)
+TweenService:Create(lE4, TweenInfo.new(0.1), { BackgroundColor3 = color }):Play()
+task.delay(0.4, function() TweenService:Create(lE4, TweenInfo.new(0.2), { BackgroundColor3 = C.apply }):Play() end)
 end
-
-motorTog.MouseButton1Click:Connect(function() updateMotorToggle(not motorState.enabled) end)
-motorApply.MouseButton1Click:Connect(function()
-    local v, t = parseNum(velBox.Text), parseNum(torqueBox.Text)
-    if not v or not t then motorFlash(C.red) return end
-    motorState.maxVel, motorState.maxTorque = v, t
-    if not motorState.enabled then updateMotorToggle(true) end
-    motorFlash(C.green)
-end)
-sectionRefs.motor = { setToggle = updateMotorToggle }
-
--- ═══════════════════════════════════════════════════════════
--- SEÇÃO: DIREÇÃO
--- ═══════════════════════════════════════════════════════════
-local _, steerTog, makeSteerRow, makeSteerToggle, steerApply, steerFlash = createSection("Steer", "🔄  Direção (A/D)", 3)
-local angleBox = makeSteerRow(2, "Max Angle",   "0.5")
-local speedBox = makeSteerRow(3, "Steer Speed", "5")
-makeSteerToggle(4, "Auto-Alinhar", false, function(state) steerState.autoAlign = state end)
-
-local function updateSteerToggle(val)
-    steerState.enabled = val
-    steerTog.Text = val and "ON" or "OFF"
-    TweenService:Create(steerTog, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
+return lcC6a, lcY80, lbX4b, lca4e, lE4, lbq2a
 end
-
-steerTog.MouseButton1Click:Connect(function() updateSteerToggle(not steerState.enabled) end)
-steerApply.MouseButton1Click:Connect(function()
-    local a, s = parseNum(angleBox.Text), parseNum(speedBox.Text)
-    if not a or not s then steerFlash(C.red) return end
-    steerState.maxAngle, steerState.speed = a, s
-    if not steerState.enabled then updateSteerToggle(true) end
-    steerFlash(C.green)
-end)
-sectionRefs.steer = { setToggle = updateSteerToggle }
-
--- ═══════════════════════════════════════════════════════════
--- SEÇÃO: MOBILE CONFIG (exclusiva mobile)
--- ═══════════════════════════════════════════════════════════
-if isMobile then
-    local mobileSec = Instance.new("Frame")
-    mobileSec.BackgroundColor3 = C.panel; mobileSec.AutomaticSize = Enum.AutomaticSize.Y
-    mobileSec.Size = UDim2.new(1, 0, 0, 0); mobileSec.LayoutOrder = 4; mobileSec.Parent = contentInner
-    uiCorner(mobileSec, 6); uiStroke(mobileSec, C.divider, 1)
-    local mPad = Instance.new("UIPadding"); mPad.PaddingTop = UDim.new(0, 6); mPad.PaddingBottom = UDim.new(0, 6); mPad.PaddingLeft = UDim.new(0, 7); mPad.PaddingRight = UDim.new(0, 7); mPad.Parent = mobileSec
-    local mList = Instance.new("UIListLayout"); mList.SortOrder = Enum.SortOrder.LayoutOrder; mList.Padding = UDim.new(0, 5); mList.Parent = mobileSec
-
-    local mHeader = Instance.new("Frame"); mHeader.Size = UDim2.new(1, 0, 0, 16); mHeader.BackgroundTransparency = 1; mHeader.LayoutOrder = 1; mHeader.Parent = mobileSec
-    local mTitle = Instance.new("TextLabel"); mTitle.BackgroundTransparency = 1; mTitle.Size = UDim2.new(1, 0, 1, 0); mTitle.Text = "📱  Mobile Config"; mTitle.Font = Enum.Font.GothamBold; mTitle.TextSize = 11; mTitle.TextColor3 = C.border; mTitle.TextXAlignment = Enum.TextXAlignment.Left; mTitle.Parent = mHeader
-
-    local function mRow(lOrder, lblTxt, defaultVal)
-        local row = Instance.new("Frame"); row.Size = UDim2.new(1, 0, 0, 18); row.BackgroundTransparency = 1; row.LayoutOrder = lOrder; row.Parent = mobileSec
-        local lbl = Instance.new("TextLabel"); lbl.BackgroundTransparency = 1; lbl.Size = UDim2.new(0.58, 0, 1, 0); lbl.Text = lblTxt; lbl.Font = Enum.Font.Gotham; lbl.TextSize = 10; lbl.TextColor3 = C.dim; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = row
-        local box = Instance.new("TextBox"); box.Size = UDim2.new(0.4, 0, 0.83, 0); box.Position = UDim2.new(0.59, 0, 0.085, 0); box.BackgroundColor3 = C.inputBg; box.Text = defaultVal; box.Font = Enum.Font.GothamMedium; box.TextSize = 10; box.TextColor3 = C.text; box.ClearTextOnFocus = true; box.Parent = row
-        uiCorner(box, 4); uiStroke(box, C.border, 1)
-        return box
-    end
-
-    local sizeBox = mRow(2, "Tam. Botões (px)", tostring(mobileState.btnSize))
-
-    -- Travar Posição
-    local lockRow = Instance.new("Frame"); lockRow.Size = UDim2.new(1, 0, 0, 18); lockRow.BackgroundTransparency = 1; lockRow.LayoutOrder = 3; lockRow.Parent = mobileSec
-    local lockLbl = Instance.new("TextLabel"); lockLbl.BackgroundTransparency = 1; lockLbl.Size = UDim2.new(0.58, 0, 1, 0); lockLbl.Text = "Travar Posição"; lockLbl.Font = Enum.Font.Gotham; lockLbl.TextSize = 10; lockLbl.TextColor3 = C.dim; lockLbl.TextXAlignment = Enum.TextXAlignment.Left; lockLbl.Parent = lockRow
-    local lockBtn = Instance.new("TextButton"); lockBtn.Size = UDim2.new(0.4, 0, 0.83, 0); lockBtn.Position = UDim2.new(0.59, 0, 0.085, 0); lockBtn.BackgroundColor3 = C.off; lockBtn.Text = "OFF"; lockBtn.Font = Enum.Font.GothamBold; lockBtn.TextSize = 9; lockBtn.TextColor3 = C.text; lockBtn.Parent = lockRow
-    uiCorner(lockBtn, 4)
-
-    local mApply = Instance.new("TextButton"); mApply.Size = UDim2.new(1, 0, 0, 16); mApply.BackgroundColor3 = C.apply; mApply.Text = "Aplicar"; mApply.Font = Enum.Font.GothamBold; mApply.TextSize = 10; mApply.TextColor3 = C.text; mApply.LayoutOrder = 10; mApply.Parent = mobileSec; uiCorner(mApply, 4)
-    local function flashM(color)
-        TweenService:Create(mApply, TweenInfo.new(0.1), { BackgroundColor3 = color }):Play()
-        task.delay(0.4, function() TweenService:Create(mApply, TweenInfo.new(0.2), { BackgroundColor3 = C.apply }):Play() end)
-    end
-
-    lockBtn.MouseButton1Click:Connect(function()
-        mobileState.locked = not mobileState.locked
-        lockBtn.Text = mobileState.locked and "ON" or "OFF"
-        TweenService:Create(lockBtn, TweenInfo.new(0.2), { BackgroundColor3 = mobileState.locked and C.on or C.off }):Play()
-        local borderColor = mobileState.locked and C.mobileLocked or C.border
-        for _, frame in pairs(mobileState.btnRefs) do
-            if frame and frame:IsA("Frame") then
-                local s = frame:FindFirstChildWhichIsA("UIStroke")
-                if s then TweenService:Create(s, TweenInfo.new(0.25), { Color = borderColor }):Play() end
-            end
-        end
-    end)
-
-    mApply.MouseButton1Click:Connect(function()
-        local sz = parseNum(sizeBox.Text)
-        if not sz or sz < 24 or sz > 160 then flashM(C.red) return end
-        mobileState.btnSize = sz
-        for _, frame in pairs(mobileState.btnRefs) do
-            if frame and frame:IsA("Frame") then
-                frame.Size = UDim2.new(0, sz, 0, sz)
-                local btn = frame:FindFirstChildWhichIsA("TextButton")
-                if btn then btn.TextSize = math.floor(sz * 0.40) end
-            end
-        end
-        flashM(C.green)
-    end)
+local _, lbl25, lbV49, _, lbh21, lbi22 = lba1a("Drift", "💨 Drift Config", 1)
+local lbx31 = lbV49(2, _0(17,{87,131,122,116,133,122,128,127,49,57,87,64,99,58}), _0(26,{74,72,77,74}))
+local lbz33 = lbV49(3, _0(21,{91,135,126,120,137,67,53,108,122,126,124,125,137}), _0(55,{108}))
+local function ldd85(val)
+lbk24.front.enabled, lbk24.rear.enabled = val, val
+lbl25.Text = val and _0(55,{134,133}) or _0(16,{95,86,86})
+TweenService:Create(lbl25, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
 end
-
--- ═══════════════════════════════════════════════════════════
--- BOTÕES MOBILE
--- ═══════════════════════════════════════════════════════════
-if isMobile then
-
-    local function createMobileBtn(icon, labelTxt, defaultPos)
-        local sz = mobileState.btnSize
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, sz, 0, sz)
-        frame.Position = defaultPos
-        frame.BackgroundColor3 = C.mobileBg
-        frame.BackgroundTransparency = 0.15
-        frame.ZIndex = 10
-        frame.Active = true
-        frame.Parent = sg
-        uiCorner(frame, 12)
-        uiStroke(frame, C.border, 2)
-
-        -- Só visual — Active=false pra NÃO roubar o toque do Frame
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 1, 0)
-        btn.BackgroundTransparency = 1
-        btn.Text = icon
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = math.floor(sz * 0.40)
-        btn.TextColor3 = C.text
-        btn.ZIndex = 11
-        btn.AutoButtonColor = false
-        btn.Active = false
-        btn.Parent = frame
-        uiCorner(btn, 12)
-
-        if labelTxt then
-            local lbl = Instance.new("TextLabel")
-            lbl.Size = UDim2.new(1, 0, 0, 11)
-            lbl.Position = UDim2.new(0, 0, 0.67, 0)
-            lbl.BackgroundTransparency = 1
-            lbl.Text = labelTxt
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 8
-            lbl.TextColor3 = C.mobileLabel
-            lbl.ZIndex = 12
-            lbl.Active = false
-            lbl.Parent = frame
-        end
-
-        return frame, btn
-    end
-
-    local frenteFrame, frenteBtn = createMobileBtn("▲", "Frente", UDim2.new(0.82, 0, 0.70, 0))
-    local reFrame,     reBtn     = createMobileBtn("▼", "Ré",     UDim2.new(0.82, 0, 0.87, 0))
-    local esqFrame,    esqBtn    = createMobileBtn("◀", "Esq",    UDim2.new(0.71, 0, 0.78, 0))
-    local dirFrame,    dirBtn    = createMobileBtn("▶", "Dir",    UDim2.new(0.93, 0, 0.78, 0))
-
-    mobileState.btnRefs.frente = frenteFrame
-    mobileState.btnRefs.re     = reFrame
-    mobileState.btnRefs.esq    = esqFrame
-    mobileState.btnRefs.dir    = dirFrame
-
-    -- ─────────────────────────────────────────────────────
-    -- setupMobileBtn:
-    --   • InputBegan no Frame (filhos com Active=false)
-    --   • InputChanged GLOBAL → arrasta mesmo com dedo fora do botão
-    --   • InputEnded GLOBAL → só para quando SOLTAR o dedo
-    -- ─────────────────────────────────────────────────────
-    local function setupMobileBtn(frame, onPress, onRelease)
-        local activeInput = nil
-        local dragging    = false
-        local isMouse     = false
-        local dragStart   = nil
-        local startPos    = nil
-        local pressed     = false  -- modo locked: botão pressionado
-
-        frame.InputBegan:Connect(function(i)
-            local isTouch = i.UserInputType == Enum.UserInputType.Touch
-            local isBtn1  = i.UserInputType == Enum.UserInputType.MouseButton1
-            if not isTouch and not isBtn1 then return end
-            if dragging or pressed then return end
-
-            isMouse = isBtn1
-            activeInput = isTouch and i or nil
-
-            if mobileState.locked then
-                pressed = true
-                if onPress then onPress() end
-                TweenService:Create(frame, TweenInfo.new(0.08), { BackgroundTransparency = 0 }):Play()
-            else
-                dragging  = true
-                dragStart = Vector2.new(i.Position.X, i.Position.Y)
-                startPos  = frame.Position
-            end
-        end)
-
-        -- Arrasta GLOBALMENTE (dedo/mouse pode sair de cima do botão)
-        local c1 = UserInputService.InputChanged:Connect(function(i)
-            if not dragging then return end
-            if isMouse then
-                if i.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-            else
-                if i ~= activeInput then return end
-            end
-            local d = Vector2.new(i.Position.X, i.Position.Y) - dragStart
-            frame.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + d.X,
-                startPos.Y.Scale, startPos.Y.Offset + d.Y
-            )
-        end)
-        table.insert(connections, c1)
-
-        -- Só termina quando SOLTAR
-        local c2 = UserInputService.InputEnded:Connect(function(i)
-            local ended = false
-            if isMouse then
-                ended = (i.UserInputType == Enum.UserInputType.MouseButton1)
-            else
-                ended = (i == activeInput)
-            end
-            if not ended then return end
-
-            activeInput = nil
-            if pressed then
-                pressed = false
-                if onRelease then onRelease() end
-                TweenService:Create(frame, TweenInfo.new(0.08), { BackgroundTransparency = 0.15 }):Play()
-            elseif dragging then
-                dragging = false
-            end
-        end)
-        table.insert(connections, c2)
-    end
-
-    setupMobileBtn(frenteFrame,
-        function()
-            if not motorState.enabled or not isPlayerInCar(currentCar) then return end
-            motorState.currentDir = "Frente"; aplicarMotor("Frente")
-        end,
-        function() motorState.currentDir = "Parar"; aplicarMotor("Parar") end
-    )
-
-    setupMobileBtn(reFrame,
-        function()
-            if not motorState.enabled or not isPlayerInCar(currentCar) then return end
-            motorState.currentDir = "Re"; aplicarMotor("Re")
-        end,
-        function() motorState.currentDir = "Parar"; aplicarMotor("Parar") end
-    )
-
-    setupMobileBtn(esqFrame,
-        function() if steerState.enabled then steerState.isA = true end end,
-        function() steerState.isA = false end
-    )
-
-    setupMobileBtn(dirFrame,
-        function() if steerState.enabled then steerState.isD = true end end,
-        function() steerState.isD = false end
-    )
+lbl25.MouseButton1Click:Connect(function()
+local lck58 = not lbk24.front.enabled
+ldd85(lck58)
+if lck58 then
+local f, lby32 = lcr5f(lbx31.Text), lcr5f(lbz33.Text)
+if f and lby32 then lF5("front", f, lby32); lF5("rear", f, lby32) end
+else
+lcz67("front"); lcz67("rear")
 end
-
--- ─────────────────────────────────────────────────────────────
--- Eventos e Loops
--- ─────────────────────────────────────────────────────────────
-local menuOpen = false
-toggleBtn.MouseButton1Click:Connect(function()
-    menuOpen = not menuOpen
-    menu.Visible = menuOpen
-    toggleBtn.Text = menuOpen and "✕  Fechar" or "⚙  Painel"
 end)
-
-local conn1 = UserInputService.InputBegan:Connect(function(input, gp)
-    if gp or not isPlayerInCar(currentCar) then return end
-    if     input.KeyCode == Enum.KeyCode.W then motorState.currentDir = "Frente"; aplicarMotor("Frente")
-    elseif input.KeyCode == Enum.KeyCode.S then motorState.currentDir = "Re";     aplicarMotor("Re")
-    elseif input.KeyCode == Enum.KeyCode.A then steerState.isA = true
-    elseif input.KeyCode == Enum.KeyCode.D then steerState.isD = true end
+lbh21.MouseButton1Click:Connect(function()
+local f, lby32 = lcr5f(lbx31.Text), lcr5f(lbz33.Text)
+if not f or not lby32 or not lbc1c then lbi22(C.red) return end
+if not lbk24.front.enabled then ldd85(true) end
+local lcm5a, lcn5b = lF5("front", f, lby32), lF5("rear", f, lby32)
+lbi22((lcm5a and lcn5b) and C.green or C.red)
 end)
-table.insert(connections, conn1)
-
-local conn2 = UserInputService.InputEnded:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.S then
-        motorState.currentDir = "Parar"; aplicarMotor("Parar")
-    elseif input.KeyCode == Enum.KeyCode.A then steerState.isA = false
-    elseif input.KeyCode == Enum.KeyCode.D then steerState.isD = false end
+lcF6d.drift = { setToggle = ldd85 }
+local _, lcj57, lbW4a, _, lcg54, lch55 = lba1a("Motor", "⚙️ Motor (W/S)", 2)
+local ldi8a = lbW4a(2, _0(41,{127,142,149,152,140,146,141,138,141,142}), _0(57,{106,111,105}))
+local lda82 = lbW4a(3, _0(48,{118,159,162,243,215,145,80,88,132,159,162,161,165,149,89}), _0(54,{109,102,102,102}))
+local function lde86(val)
+lci56.enabled = val
+lcj57.Text = val and _0(55,{134,133}) or _0(16,{95,86,86})
+TweenService:Create(lcj57, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
+end
+lcj57.MouseButton1Click:Connect(function() lde86(not lci56.enabled) end)
+lcg54.MouseButton1Click:Connect(function()
+local v, t = lcr5f(ldi8a.Text), lcr5f(lda82.Text)
+if not v or not t then lch55(C.red) return end
+lci56.maxVel, lci56.maxTorque = v, t
+if not lci56.enabled then lde86(true) end
+lch55(C.green)
 end)
-table.insert(connections, conn2)
-
--- Loop Principal
-local updateTick = 0
-local wasInCar   = false
-
-local conn3 = RunService.RenderStepped:Connect(function(deltaTime)
-    updateTick = updateTick + deltaTime
-    if updateTick >= 0.75 then
-        updateTick = 0
-        local found = findPlayerCar()
-        if found ~= currentCar then
-            currentCar = found
-            driftOriginals = { front = nil, rear = nil }
-            for _, ref in pairs(sectionRefs) do ref.setToggle(false) end
-        end
-    end
-
-    local inCar = isPlayerInCar(currentCar)
-    if wasInCar and not inCar then
-        steerState.isA = false; steerState.isD = false
-        if motorState.enabled then aplicarMotor("Parar") end
-    end
-    wasInCar = inCar
-
-    if steerState.enabled and currentCar then
-        local steerDirection = 0
-        if inCar then
-            if     steerState.isA and not steerState.isD then steerDirection = -1
-            elseif steerState.isD and not steerState.isA then steerDirection =  1 end
-        end
-
-        local slipAngle = 0
-        if steerState.autoAlign and inCar then
-            local root = currentCar:FindFirstChild("DriveSeat") or currentCar.PrimaryPart or currentCar:FindFirstChildWhichIsA("BasePart", true)
-            if root then
-                local vel = root.AssemblyLinearVelocity
-                if vel.Magnitude > 5 then
-                    local localVel = root.CFrame:VectorToObjectSpace(vel)
-                    slipAngle = math.atan2(localVel.X, -localVel.Z)
-                    slipAngle = math.clamp(slipAngle, -steerState.maxAngle, steerState.maxAngle)
-                end
-            end
-        end
-
-        if steerDirection ~= 0 then
-            steerState.currentSteer = math.clamp(steerState.currentSteer + (steerDirection * steerState.speed * deltaTime), -steerState.maxAngle, steerState.maxAngle)
-        else
-            local target = (steerState.autoAlign and inCar) and slipAngle or 0
-            if steerState.currentSteer < target then
-                steerState.currentSteer = math.min(target, steerState.currentSteer + (steerState.speed * deltaTime))
-            elseif steerState.currentSteer > target then
-                steerState.currentSteer = math.max(target, steerState.currentSteer - (steerState.speed * deltaTime))
-            end
-        end
-
-        local wheels = { currentCar:FindFirstChild("FR"), currentCar:FindFirstChild("FL") }
-        for _, wheel in pairs(wheels) do
-            if wheel then
-                local axel = wheel:FindFirstChild("Axel")
-                if axel then
-                    local att = axel:FindFirstChild("Attachment0")
-                    if att then att.Axis = Vector3.new(att.Axis.X, att.Axis.Y, steerState.currentSteer) end
-                end
-            end
-        end
-    end
+lcF6d.motor = { setToggle = lde86 }
+local _, lcR79, lbY4c, lbZ4d, lcN75, lcP77 = lba1a("Steer", "🔄 Direção (A/D)", 3)
+local lC2 = lbY4c(2, _0(33,{110,130,153,65,98,143,136,141,134}), _0(55,{103,101,108}))
+local lcK72 = lbY4c(3, _0(56,{139,172,157,157,170,88,139,168,157,157,156}), _0(55,{108}))
+lbZ4d(4, _0(49,{114,166,165,160,94,114,157,154,159,153,146,163}), false, function(state) lcQ78.autoAlign = state end)
+local function ldf87(val)
+lcQ78.enabled = val
+lcR79.Text = val and _0(55,{134,133}) or _0(16,{95,86,86})
+TweenService:Create(lcR79, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
+end
+lcR79.MouseButton1Click:Connect(function() ldf87(not lcQ78.enabled) end)
+lcN75.MouseButton1Click:Connect(function()
+local a, s = lcr5f(lC2.Text), lcr5f(lcK72.Text)
+if not a or not s then lcP77(C.red) return end
+lcQ78.maxAngle, lcQ78.speed = a, s
+if not lcQ78.enabled then ldf87(true) end
+lcP77(C.green)
+end)
+lcF6d.steer = { setToggle = ldf87 }
+if lbF39 then
+local lce52 = Instance.new("Frame")
+lce52.BackgroundColor3 = C.panel; lce52.AutomaticSize = Enum.AutomaticSize.Y
+lce52.Size = UDim2.new(1, 0, 0, 0); lce52.LayoutOrder = 4; lce52.Parent = lV15
+ldb83(lce52, 6); ldc84(lce52, C.divider, 1)
+local lbR45 = Instance.new("UIPadding"); lbR45.PaddingTop = UDim.new(0, 6); lbR45.PaddingBottom = UDim.new(0, 6); lbR45.PaddingLeft = UDim.new(0, 7); lbR45.PaddingRight = UDim.new(0, 7); lbR45.Parent = lce52
+local lbQ44 = Instance.new("UIListLayout"); lbQ44.SortOrder = Enum.SortOrder.LayoutOrder; lbQ44.Padding = UDim.new(0, 5); lbQ44.Parent = lce52
+local lbP43 = Instance.new("Frame"); lbP43.Size = UDim2.new(1, 0, 0, 16); lbP43.BackgroundTransparency = 1; lbP43.LayoutOrder = 1; lbP43.Parent = lce52
+local lbT47 = Instance.new("TextLabel"); lbT47.BackgroundTransparency = 1; lbT47.Size = UDim2.new(1, 0, 1, 0); lbT47.Text = "📱 Mobile Config"; lbT47.Font = Enum.Font.GothamBold; lbT47.TextSize = 11; lbT47.TextColor3 = C.border; lbT47.TextXAlignment = Enum.TextXAlignment.Left; lbT47.Parent = lbP43
+local function lbS46(lOrder, lblTxt, defaultVal)
+local lcB69 = Instance.new("Frame"); lcB69.Size = UDim2.new(1, 0, 0, 18); lcB69.BackgroundTransparency = 1; lcB69.LayoutOrder = lOrder; lcB69.Parent = lce52
+local lbJ3d = Instance.new("TextLabel"); lbJ3d.BackgroundTransparency = 1; lbJ3d.Size = UDim2.new(0.58, 0, 1, 0); lbJ3d.Text = lblTxt; lbJ3d.Font = Enum.Font.Gotham; lbJ3d.TextSize = 10; lbJ3d.TextColor3 = C.dim; lbJ3d.TextXAlignment = Enum.TextXAlignment.Left; lbJ3d.Parent = lcB69
+local lLb = Instance.new("TextBox"); lLb.Size = UDim2.new(0.4, 0, 0.83, 0); lLb.Position = UDim2.new(0.59, 0, 0.085, 0); lLb.BackgroundColor3 = C.inputBg; lLb.Text = defaultVal; lLb.Font = Enum.Font.GothamMedium; lLb.TextSize = 10; lLb.TextColor3 = C.text; lLb.ClearTextOnFocus = true; lLb.Parent = lcB69
+ldb83(lLb, 4); ldc84(lLb, C.border, 1)
+return lLb
+end
+local lcI70 = lbS46(2, _0(28,{112,125,137,74,60,94,139,144,223,209,129,143,60,68,140,148,69}), tostring(lcf53.btnSize))
+local lbN41 = Instance.new("Frame"); lbN41.Size = UDim2.new(1, 0, 0, 18); lbN41.BackgroundTransparency = 1; lbN41.LayoutOrder = 3; lbN41.Parent = lce52
+local lbM40 = Instance.new("TextLabel"); lbM40.BackgroundTransparency = 1; lbM40.Size = UDim2.new(0.58, 0, 1, 0); lbM40.Text = _0(18,{102,132,115,136,115,132,50,98,129,133,123,213,185,213,181,129}); lbM40.Font = Enum.Font.Gotham; lbM40.TextSize = 10; lbM40.TextColor3 = C.dim; lbM40.TextXAlignment = Enum.TextXAlignment.Left; lbM40.Parent = lbN41
+local lbL3f = Instance.new("TextButton"); lbL3f.Size = UDim2.new(0.4, 0, 0.83, 0); lbL3f.Position = UDim2.new(0.59, 0, 0.085, 0); lbL3f.BackgroundColor3 = C.off; lbL3f.Text = _0(16,{95,86,86}); lbL3f.Font = Enum.Font.GothamBold; lbL3f.TextSize = 9; lbL3f.TextColor3 = C.text; lbL3f.Parent = lbN41
+ldb83(lbL3f, 4)
+local lbO42 = Instance.new("TextButton"); lbO42.Size = UDim2.new(1, 0, 0, 16); lbO42.BackgroundColor3 = C.apply; lbO42.Text = _0(41,{106,153,149,146,140,138,155}); lbO42.Font = Enum.Font.GothamBold; lbO42.TextSize = 10; lbO42.TextColor3 = C.text; lbO42.LayoutOrder = 10; lbO42.Parent = lce52; ldb83(lbO42, 4)
+local function lbr2b(color)
+TweenService:Create(lbO42, TweenInfo.new(0.1), { BackgroundColor3 = color }):Play()
+task.delay(0.4, function() TweenService:Create(lbO42, TweenInfo.new(0.2), { BackgroundColor3 = C.apply }):Play() end)
+end
+lbL3f.MouseButton1Click:Connect(function()
+lcf53.locked = not lcf53.locked
+lbL3f.Text = lcf53.locked and _0(55,{134,133}) or _0(16,{95,86,86})
+TweenService:Create(lbL3f, TweenInfo.new(0.2), { BackgroundColor3 = lcf53.locked and C.on or C.off }):Play()
+local lKa = lcf53.locked and C.mobileLocked or C.border
+for _, lbu2e in pairs(lcf53.btnRefs) do
+if lbu2e and lbu2e:IsA("Frame") then
+local s = lbu2e:FindFirstChildWhichIsA("UIStroke")
+if s then TweenService:Create(s, TweenInfo.new(0.25), { Color = lKa }):Play() end
+end
+end
+end)
+lbO42.MouseButton1Click:Connect(function()
+local lcT7b = lcr5f(lcI70.Text)
+if not lcT7b or lcT7b < 24 or lcT7b > 160 then lbr2b(C.red) return end
+lcf53.btnSize = lcT7b
+for _, lbu2e in pairs(lcf53.btnRefs) do
+if lbu2e and lbu2e:IsA("Frame") then
+lbu2e.Size = UDim2.new(0, lcT7b, 0, lcT7b)
+local lMc = lbu2e:FindFirstChildWhichIsA("TextButton")
+if lMc then lMc.TextSize = math.floor(lcT7b * 0.40) end
+end
+end
+lbr2b(C.green)
+end)
+end
+if lbF39 then
+local function lZ19(icon, labelTxt, defaultPos)
+local lcT7b = lcf53.btnSize
+local lbu2e = Instance.new("Frame")
+lbu2e.Size = UDim2.new(0, lcT7b, 0, lcT7b)
+lbu2e.Position = defaultPos
+lbu2e.BackgroundColor3 = C.mobileBg
+lbu2e.BackgroundTransparency = 0.15
+lbu2e.ZIndex = 10
+lbu2e.Active = true
+lbu2e.Parent = lcH6f
+ldb83(lbu2e, 12)
+ldc84(lbu2e, C.border, 2)
+local lMc = Instance.new("TextButton")
+lMc.Size = UDim2.new(1, 0, 1, 0)
+lMc.BackgroundTransparency = 1
+lMc.Text = icon
+lMc.Font = Enum.Font.GothamBold
+lMc.TextSize = math.floor(lcT7b * 0.40)
+lMc.TextColor3 = C.text
+lMc.ZIndex = 11
+lMc.AutoButtonColor = false
+lMc.Active = false
+lMc.Parent = lbu2e
+ldb83(lMc, 12)
+if labelTxt then
+local lbJ3d = Instance.new("TextLabel")
+lbJ3d.Size = UDim2.new(1, 0, 0, 11)
+lbJ3d.Position = UDim2.new(0, 0, 0.67, 0)
+lbJ3d.BackgroundTransparency = 1
+lbJ3d.Text = labelTxt
+lbJ3d.Font = Enum.Font.Gotham
+lbJ3d.TextSize = 8
+lbJ3d.TextColor3 = C.mobileLabel
+lbJ3d.ZIndex = 12
+lbJ3d.Active = false
+lbJ3d.Parent = lbu2e
+end
+return lbu2e, lMc
+end
+local lbw30, lbv2f = lZ19("▲", _0(58,{128,172,159,168,174,159}), UDim2.new(0.82, 0, 0.70, 0))
+local lcw64, lcv63 = lZ19("▼", _0(60,{142,255,229}), UDim2.new(0.82, 0, 0.87, 0))
+local lbo28, lbn27 = lZ19("◀", _0(19,{88,134,132}), UDim2.new(0.71, 0, 0.78, 0))
+local lbe1e, lbd1d = lZ19("▶", _0(25,{93,130,139}), UDim2.new(0.93, 0, 0.78, 0))
+lcf53.btnRefs.frente = lbw30
+lcf53.btnRefs.re = lcw64
+lcf53.btnRefs.esq = lbo28
+lcf53.btnRefs.dir = lbe1e
+local function lcG6e(lbu2e, onPress, onRelease)
+local lB1 = nil
+local lbg20 = false
+local lbG3a = false
+local lbf1f = nil
+local lcL73 = nil
+local lcu62 = false
+lbu2e.InputBegan:Connect(function(i)
+local lbI3c = i.UserInputType == Enum.UserInputType.Touch
+local lbE38 = i.UserInputType == Enum.UserInputType.MouseButton1
+if not lbI3c and not lbE38 then return end
+if lbg20 or lcu62 then return end
+lbG3a = lbE38
+lB1 = lbI3c and i or nil
+if lcf53.locked then
+lcu62 = true
+if onPress then onPress() end
+TweenService:Create(lbu2e, TweenInfo.new(0.08), { BackgroundTransparency = 0 }):Play()
+else
+lbg20 = true
+lbf1f = Vector2.new(i.Position.X, i.Position.Y)
+lcL73 = lbu2e.Position
+end
+end)
+local lNd = UserInputService.InputChanged:Connect(function(i)
+if not lbg20 then return end
+if lbG3a then
+if i.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+else
+if i ~= lB1 then return end
+end
+local d = Vector2.new(i.Position.X, i.Position.Y) - lbf1f
+lbu2e.Position = UDim2.new(
+lcL73.X.Scale, lcL73.X.Offset + d.X,
+lcL73.Y.Scale, lcL73.Y.Offset + d.Y
+)
+end)
+table.insert(lT13, lNd)
+local lOe = UserInputService.InputEnded:Connect(function(i)
+local lbm26 = false
+if lbG3a then
+lbm26 = (i.UserInputType == Enum.UserInputType.MouseButton1)
+else
+lbm26 = (i == lB1)
+end
+if not lbm26 then return end
+lB1 = nil
+if lcu62 then
+lcu62 = false
+if onRelease then onRelease() end
+TweenService:Create(lbu2e, TweenInfo.new(0.08), { BackgroundTransparency = 0.15 }):Play()
+elseif lbg20 then
+lbg20 = false
+end
+end)
+table.insert(lT13, lOe)
+end
+lcG6e(lbw30,
+function()
+if not lci56.enabled or not lbH3b(lbc1c) then return end
+lci56.currentDir = _0(58,{128,172,159,168,174,159}); lD3(_0(58,{128,172,159,168,174,159}))
+end,
+function() lci56.currentDir = _0(31,{111,128,145,128,145}); lD3(_0(31,{111,128,145,128,145})) end
+)
+lcG6e(lcw64,
+function()
+if not lci56.enabled or not lbH3b(lbc1c) then return end
+lci56.currentDir = _0(59,{141,160}); lD3(_0(59,{141,160}))
+end,
+function() lci56.currentDir = _0(31,{111,128,145,128,145}); lD3(_0(31,{111,128,145,128,145})) end
+)
+lcG6e(lbo28,
+function() if lcQ78.enabled then lcQ78.isA = true end end,
+function() lcQ78.isA = false end
+)
+lcG6e(lbe1e,
+function() if lcQ78.enabled then lcQ78.isD = true end end,
+function() lcQ78.isD = false end
+)
+end
+local lcd51 = false
+lcZ81.MouseButton1Click:Connect(function()
+lcd51 = not lcd51
+lcb4f.Visible = lcd51
+lcZ81.Text = lcd51 and "✕ Fechar" or "⚙ Painel"
+end)
+local lPf = UserInputService.InputBegan:Connect(function(input, gp)
+if gp or not lbH3b(lbc1c) then return end
+if input.KeyCode == Enum.KeyCode.W then lci56.currentDir = _0(58,{128,172,159,168,174,159}); lD3(_0(58,{128,172,159,168,174,159}))
+elseif input.KeyCode == Enum.KeyCode.S then lci56.currentDir = _0(59,{141,160}); lD3(_0(59,{141,160}))
+elseif input.KeyCode == Enum.KeyCode.A then lcQ78.isA = true
+elseif input.KeyCode == Enum.KeyCode.D then lcQ78.isD = true end
+end)
+table.insert(lT13, lPf)
+local lQ10 = UserInputService.InputEnded:Connect(function(input, gp)
+if gp then return end
+if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.S then
+lci56.currentDir = _0(31,{111,128,145,128,145}); lD3(_0(31,{111,128,145,128,145}))
+elseif input.KeyCode == Enum.KeyCode.A then lcQ78.isA = false
+elseif input.KeyCode == Enum.KeyCode.D then lcQ78.isD = false end
+end)
+table.insert(lT13, lQ10)
+local ldg88 = 0
+local ldk8c = false
+local lR11 = RunService.RenderStepped:Connect(function(deltaTime)
+ldg88 = ldg88 + deltaTime
+if ldg88 >= 0.75 then
+ldg88 = 0
+local lbt2d = lbp29()
+if lbt2d ~= lbc1c then
+lbc1c = lbt2d
+lbj23 = { front = nil, rear = nil }
+for _, ref in pairs(lcF6d) do ref.setToggle(false) end
+end
+end
+local lbD37 = lbH3b(lbc1c)
+if ldk8c and not lbD37 then
+lcQ78.isA = false; lcQ78.isD = false
+if lci56.enabled then lD3(_0(31,{111,128,145,128,145})) end
+end
+ldk8c = lbD37
+if lcQ78.enabled and lbc1c then
+local lcO76 = 0
+if lbD37 then
+if lcQ78.isA and not lcQ78.isD then lcO76 = -1
+elseif lcQ78.isD and not lcQ78.isA then lcO76 = 1 end
+end
+local lcJ71 = 0
+if lcQ78.autoAlign and lbD37 then
+local lcA68 = lbc1c:FindFirstChild("DriveSeat") or lbc1c.PrimaryPart or lbc1c:FindFirstChildWhichIsA("BasePart", true)
+if lcA68 then
+local ldh89 = lcA68.AssemblyLinearVelocity
+if ldh89.Magnitude > 5 then
+local lbK3e = lcA68.CFrame:VectorToObjectSpace(ldh89)
+lcJ71 = math.atan2(lbK3e.X, -lbK3e.Z)
+lcJ71 = math.clamp(lcJ71, -lcQ78.maxAngle, lcQ78.maxAngle)
+end
+end
+end
+if lcO76 ~= 0 then
+lcQ78.currentSteer = math.clamp(lcQ78.currentSteer + (lcO76 * lcQ78.speed * deltaTime), -lcQ78.maxAngle, lcQ78.maxAngle)
+else
+local lcU7c = (lcQ78.autoAlign and lbD37) and lcJ71 or 0
+if lcQ78.currentSteer < lcU7c then
+lcQ78.currentSteer = math.min(lcU7c, lcQ78.currentSteer + (lcQ78.speed * deltaTime))
+elseif lcQ78.currentSteer > lcU7c then
+lcQ78.currentSteer = math.max(lcU7c, lcQ78.currentSteer - (lcQ78.speed * deltaTime))
+end
+end
+local ldl8d = { lbc1c:FindFirstChild("FR"), lbc1c:FindFirstChild("FL") }
+for _, wheel in pairs(ldl8d) do
+if wheel then
+local lH7 = wheel:FindFirstChild("Axel")
+if lH7 then
+local lG6 = lH7:FindFirstChild("Attachment0")
+if lG6 then lG6.Axis = Vector3.new(lG6.Axis.X, lG6.Axis.Y, lcQ78.currentSteer) end
+end
+end
+end
+end
 end)
