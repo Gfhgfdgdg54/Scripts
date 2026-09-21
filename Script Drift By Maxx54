@@ -4,9 +4,9 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local lcs60 = Players.LocalPlayer
-local lct61 = lcs60:WaitForChild("PlayerGui")
-local lbF39 = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local lcu62 = Players.LocalPlayer
+local lcv63 = lcu62:WaitForChild("PlayerGui")
+local lbG3a = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local C = {
 bg = Color3.fromRGB(20, 20, 20),
 panel = Color3.fromRGB(30, 30, 30),
@@ -25,57 +25,57 @@ mobileBg = Color3.fromRGB(20, 20, 20),
 mobileLabel = Color3.fromRGB(130, 130, 130),
 mobileLocked = Color3.fromRGB(0, 190, 70),
 }
-local lbc1c = nil
-local lT13 = {}
-local lcF6d = {}
-local lbk24 = { front = { enabled = false }, rear = { enabled = false } }
-local lbj23 = { front = nil, rear = nil }
-local lci56 = { enabled = false, maxVel = 100, maxTorque = 50000, currentDir = _0(31,{111,128,145,128,145}) }
-local lcQ78 = { enabled = false, autoAlign = false, maxAngle = 0.4, speed = 0.5, currentSteer = 0, isA = false, isD = false }
-local lcf53 = {
-locked = false,
+local lbd1d = nil
+local lU14 = {}
+local lcI70 = {}
+local lbl25 = { front = { enabled = false }, rear = { enabled = false } }
+local lbk24 = { front = nil, rear = nil }
+local lcj57 = { enabled = false, maxVel = 100, maxTorque = 50000, currentDir = _0(56,{136,153,170,153,170}) }
+local lcT7b = { enabled = false, autoAlign = false, maxAngle = 0.4, speed = 0.5, currentSteer = 0, isA = false, isD = false }
+local lcg54 = {
+locked = true,
 btnSize = 56,
 btnRefs = {},
 }
-local function lbp29()
-local lbs2c = workspace:FindFirstChild("Cars")
-if not lbs2c then return nil end
-for _, car in ipairs(lbs2c:GetChildren()) do
-local lcM74 = car:FindFirstChild("Stats")
-if lcM74 then
-local lcp5d = lcM74:FindFirstChild("Owner")
-if lcp5d and (lcp5d.Value == lcs60.Name or lcp5d.Value == lcs60 or lcp5d.Value == lcs60.UserId) then
+local function lbq2a()
+local lbt2d = workspace:FindFirstChild("Cars")
+if not lbt2d then return nil end
+for _, car in ipairs(lbt2d:GetChildren()) do
+local lcP77 = car:FindFirstChild("Stats")
+if lcP77 then
+local lcr5f = lcP77:FindFirstChild("Owner")
+if lcr5f and (lcr5f.Value == lcu62.Name or lcr5f.Value == lcu62 or lcr5f.Value == lcu62.UserId) then
 return car
 end
 end
 end
 return nil
 end
-local function lbH3b(car)
-if not car or not lcs60.Character then return false end
-local lbC36 = lcs60.Character:FindFirstChild("Humanoid")
-if not lbC36 or not lbC36.SeatPart then return false end
-return lbC36.SeatPart:IsDescendantOf(car)
+local function lbI3c(car)
+if not car or not lcu62.Character then return false end
+local lbD37 = lcu62.Character:FindFirstChild("Humanoid")
+if not lbD37 or not lbD37.SeatPart then return false end
+return lbD37.SeatPart:IsDescendantOf(car)
 end
-local function lcr5f(str)
+local function lct61(str)
 return tonumber((str:gsub(",", ".")))
 end
 local lA0 = { front = { "FL", "FR" }, rear = { "RL", "RR" } }
-local function lbA34(car, group)
-local lcy66 = {}
+local function lbB35(car, group)
+local lcB69 = {}
 for _, obj in ipairs(car:GetChildren()) do
 for _, pfx in ipairs(lA0[group]) do
 if obj.Name == pfx or obj.Name:match("^" .. pfx .. "_%d+$") then
 local w = obj:FindFirstChild("Wheel")
-if w and w:IsA("BasePart") then table.insert(lcy66, w) end
-local lcS7a = obj:FindFirstChild("SecondaryWheel")
-if lcS7a and lcS7a:IsA("BasePart") then table.insert(lcy66, lcS7a) end
+if w and w:IsA("BasePart") then table.insert(lcB69, w) end
+local lcV7d = obj:FindFirstChild("SecondaryWheel")
+if lcV7d and lcV7d:IsA("BasePart") then table.insert(lcB69, lcV7d) end
 end
 end
 end
-return lcy66
+return lcB69
 end
-local function lcx65(wheel)
+local function lcz67(wheel)
 local p = wheel.CustomPhysicalProperties
 if typeof(p) == "PhysicalProperties" then
 return { density = p.Density, friction = p.Friction, elasticity = p.Elasticity, frictionWeight = p.FrictionWeight, elasticityWeight = p.ElasticityWeight }
@@ -83,496 +83,519 @@ end
 return { density = 0.7, friction = 0.3, elasticity = 0.5, frictionWeight = 1.0, elasticityWeight = 1.0 }
 end
 local function lF5(group, friction, frictionWeight)
-if not lbc1c then return false end
-local ldl8d = lbA34(lbc1c, group)
-if #ldl8d == 0 then return false end
-if not lbj23[group] then lbj23[group] = lcx65(ldl8d[1]) end
-local lI8 = lbj23[group]
-for _, w in ipairs(ldl8d) do
+if not lbd1d then return false end
+local ldo90 = lbB35(lbd1d, group)
+if #ldo90 == 0 then return false end
+if not lbk24[group] then lbk24[group] = lcz67(ldo90[1]) end
+local lI8 = lbk24[group]
+for _, w in ipairs(ldo90) do
 w.CustomPhysicalProperties = PhysicalProperties.new(lI8.density, friction, lI8.elasticity, frictionWeight, lI8.elasticityWeight)
 end
 return true
 end
-local function lcz67(group)
-if not lbc1c or not lbj23[group] then return end
-local ldl8d = lbA34(lbc1c, group)
-local o = lbj23[group]
-for _, w in ipairs(ldl8d) do
+local function lcC6a(group)
+if not lbd1d or not lbk24[group] then return end
+local ldo90 = lbB35(lbd1d, group)
+local o = lbk24[group]
+for _, w in ipairs(ldo90) do
 w.CustomPhysicalProperties = PhysicalProperties.new(o.density, o.friction, o.elasticity, o.frictionWeight, o.elasticityWeight)
 end
 end
-local function lcl59()
-if not lbc1c then return nil end
-local lU14 = lbc1c:FindFirstChild("Constraints")
-if lU14 then
-for _, item in pairs(lU14:GetChildren()) do
-if item.Name == _0(46,{116,160,157,156,162}) or item.Name == _0(44,{126,145,141,158}) then item.Name = _0(47,{129,158,147,144,162}) end
+local function lcn5b()
+if not lbd1d then return nil end
+local lV15 = lbd1d:FindFirstChild("Constraints")
+if lV15 then
+for _, item in pairs(lV15:GetChildren()) do
+if item.Name == _0(25,{95,139,136,135,141}) or item.Name == _0(55,{137,156,152,169}) then item.Name = _0(41,{123,152,141,138,156}) end
 end
-return lU14
+return lV15
 end
 return nil
 end
 local function lD3(direcao)
-if not lci56.enabled then return end
-local lU14 = lcl59()
-if not lU14 then return end
-local ldj8b = 0
-if direcao == _0(58,{128,172,159,168,174,159}) then ldj8b = -math.abs(lci56.maxVel)
-elseif direcao == _0(59,{141,160}) then ldj8b = math.abs(lci56.maxVel) end
-if direcao ~= _0(31,{111,128,145,128,145}) and not lbH3b(lbc1c) then ldj8b = 0 end
-for _, motor in pairs(lU14:GetChildren()) do
-if motor.Name == _0(47,{129,158,147,144,162}) and (motor:IsA("CylindricalConstraint") or motor:IsA("HingeConstraint")) then
+if not lcj57.enabled then return end
+local lV15 = lcn5b()
+if not lV15 then return end
+local ldm8e = 0
+if direcao == _0(22,{92,136,123,132,138,123}) then ldm8e = -math.abs(lcj57.maxVel)
+elseif direcao == _0(41,{123,142}) then ldm8e = math.abs(lcj57.maxVel) end
+if direcao ~= _0(56,{136,153,170,153,170}) and not lbI3c(lbd1d) then ldm8e = 0 end
+for _, motor in pairs(lV15:GetChildren()) do
+if motor.Name == _0(41,{123,152,141,138,156}) and (motor:IsA("CylindricalConstraint") or motor:IsA("HingeConstraint")) then
 motor.ActuatorType = Enum.ActuatorType.Motor
-motor.MotorMaxTorque = lci56.maxTorque
-motor.AngularVelocity = ldj8b
+motor.MotorMaxTorque = lcj57.maxTorque
+motor.AngularVelocity = ldm8e
 end
 end
 end
-local function ldb83(parent, r)
+local function lde86(parent, r)
 local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 6); c.Parent = parent
 end
-local function ldc84(parent, color, thick)
+local function ldf87(parent, color, thick)
 local s = Instance.new("UIStroke"); s.Color = color or C.border; s.Thickness = thick or 1.5; s.Parent = parent; return s
 end
-local function lbU48(lbu2e, handle)
-handle = handle or lbu2e
-local lbg20 = false
-local lbG3a = false
-local lbf1f = nil
-local lcL73 = nil
+local function lbV49(lbv2f, handle)
+handle = handle or lbv2f
+local lbh21 = false
+local lbH3b = false
+local lbg20 = nil
+local lcO76 = nil
 local lB1 = nil
 local function lJ9(i)
 if i.UserInputType == Enum.UserInputType.MouseButton1 then
-lbg20 = true
-lbG3a = true
+lbh21 = true
+lbH3b = true
 lB1 = nil
-lbf1f = Vector2.new(i.Position.X, i.Position.Y)
-lcL73 = lbu2e.Position
+lbg20 = Vector2.new(i.Position.X, i.Position.Y)
+lcO76 = lbv2f.Position
 elseif i.UserInputType == Enum.UserInputType.Touch then
-lbg20 = true
-lbG3a = false
+lbh21 = true
+lbH3b = false
 lB1 = i
-lbf1f = Vector2.new(i.Position.X, i.Position.Y)
-lcL73 = lbu2e.Position
+lbg20 = Vector2.new(i.Position.X, i.Position.Y)
+lcO76 = lbv2f.Position
 end
 end
-local function lS12(obj)
+local function lT13(obj)
 obj.InputBegan:Connect(lJ9)
 for _, child in ipairs(obj:GetChildren()) do
 if child:IsA("GuiObject") then
-lS12(child)
+lT13(child)
 end
 end
 end
-lS12(handle)
+lT13(handle)
 local lNd = UserInputService.InputChanged:Connect(function(i)
-if not lbg20 then return end
-if lbG3a then
+if not lbh21 then return end
+if lbH3b then
 if i.UserInputType ~= Enum.UserInputType.MouseMovement then return end
 else
 if i ~= lB1 then return end
 end
-local d = Vector2.new(i.Position.X, i.Position.Y) - lbf1f
-lbu2e.Position = UDim2.new(
-lcL73.X.Scale, lcL73.X.Offset + d.X,
-lcL73.Y.Scale, lcL73.Y.Offset + d.Y
+local d = Vector2.new(i.Position.X, i.Position.Y) - lbg20
+lbv2f.Position = UDim2.new(
+lcO76.X.Scale, lcO76.X.Offset + d.X,
+lcO76.Y.Scale, lcO76.Y.Offset + d.Y
 )
 end)
-table.insert(lT13, lNd)
+table.insert(lU14, lNd)
 local lOe = UserInputService.InputEnded:Connect(function(i)
-if not lbg20 then return end
-if lbG3a then
+if not lbh21 then return end
+if lbH3b then
 if i.UserInputType == Enum.UserInputType.MouseButton1 then
-lbg20 = false
+lbh21 = false
 end
 else
 if i == lB1 then
-lbg20 = false
+lbh21 = false
 lB1 = nil
 end
 end
 end)
-table.insert(lT13, lOe)
+table.insert(lU14, lOe)
 end
-local lco5c = lct61:FindFirstChild(_0(36,{103,104,120,103,147,146,152,150,147,144,144,137,150}))
-if lco5c then lco5c:Destroy() end
-local lcH6f = Instance.new("ScreenGui")
-lcH6f.Name = _0(36,{103,104,120,103,147,146,152,150,147,144,144,137,150}); lcH6f.ResetOnSpawn = false; lcH6f.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; lcH6f.Parent = lct61
-lcH6f:GetPropertyChangedSignal("Parent"):Connect(function()
-if not lcH6f.Parent then for _, c in ipairs(lT13) do c:Disconnect() end end
+local lcq5e = lcv63:FindFirstChild(_0(41,{108,109,125,108,152,151,157,155,152,149,149,142,155}))
+if lcq5e then lcq5e:Destroy() end
+local lcK72 = Instance.new("ScreenGui")
+lcK72.Name = _0(41,{108,109,125,108,152,151,157,155,152,149,149,142,155}); lcK72.ResetOnSpawn = false; lcK72.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; lcK72.Parent = lcv63
+lcK72:GetPropertyChangedSignal("Parent"):Connect(function()
+if not lcK72.Parent then for _, c in ipairs(lU14) do c:Disconnect() end end
 end)
-local lcZ81 = Instance.new("TextButton")
-lcZ81.Size = UDim2.new(0, 94, 0, 24); lcZ81.Position = UDim2.new(0, 14, 0.5, -12)
-lcZ81.BackgroundColor3 = C.bg; lcZ81.Text = "⚙ Painel"
-lcZ81.Font = Enum.Font.GothamBold; lcZ81.TextSize = 11; lcZ81.TextColor3 = C.text
-lcZ81.Parent = lcH6f; ldb83(lcZ81, 8); ldc84(lcZ81, C.border, 1.5)
-lbU48(lcZ81)
-local lcb4f = Instance.new("Frame")
-lcb4f.Size = UDim2.new(0, 190, 0, 0); lcb4f.Position = UDim2.new(0, 120, 0.5, -12)
-lcb4f.BackgroundColor3 = C.bg; lcb4f.AutomaticSize = Enum.AutomaticSize.Y; lcb4f.Visible = false; lcb4f.Parent = lcH6f
-ldb83(lcb4f, 8); ldc84(lcb4f, C.border, 1.5)
+local ldc84 = Instance.new("TextButton")
+ldc84.Size = UDim2.new(0, 94, 0, 24); ldc84.Position = UDim2.new(0, 14, 0.5, -12)
+ldc84.BackgroundColor3 = C.bg; ldc84.Text = "⚙ Painel"
+ldc84.Font = Enum.Font.GothamBold; ldc84.TextSize = 11; ldc84.TextColor3 = C.text
+ldc84.Parent = lcK72; lde86(ldc84, 8); ldf87(ldc84, C.border, 1.5)
+lbV49(ldc84)
+local lcc50 = Instance.new("Frame")
+lcc50.Size = UDim2.new(0, 190, 0, 0); lcc50.Position = UDim2.new(0, 120, 0.5, -12)
+lcc50.BackgroundColor3 = C.bg; lcc50.AutomaticSize = Enum.AutomaticSize.Y; lcc50.Visible = false; lcc50.Parent = lcK72
+lde86(lcc50, 8); ldf87(lcc50, C.border, 1.5)
 Instance.new("UIListLayout").SortOrder = Enum.SortOrder.LayoutOrder
-local lcc50 = Instance.new("UIListLayout"); lcc50.SortOrder = Enum.SortOrder.LayoutOrder; lcc50.Parent = lcb4f
-local lcV7d = Instance.new("Frame"); lcV7d.Size = UDim2.new(1, 0, 0, 24); lcV7d.BackgroundColor3 = C.panel; lcV7d.LayoutOrder = 1; lcV7d.Parent = lcb4f; ldb83(lcV7d, 8)
-local lcW7e = Instance.new("Frame"); lcW7e.Size = UDim2.new(1, 0, 0.5, 0); lcW7e.Position = UDim2.new(0, 0, 0.5, 0); lcW7e.BackgroundColor3 = C.panel; lcW7e.BorderSizePixel = 0; lcW7e.Active = false; lcW7e.Parent = lcV7d
-local lcX7f = Instance.new("TextLabel"); lcX7f.BackgroundTransparency = 1; lcX7f.Size = UDim2.new(1, -8, 1, 0); lcX7f.Position = UDim2.new(0, 8, 0, 0); lcX7f.Text = "🚗 Multi Controller"; lcX7f.Font = Enum.Font.GothamBold; lcX7f.TextSize = 11; lcX7f.TextColor3 = C.title; lcX7f.TextXAlignment = Enum.TextXAlignment.Left; lcX7f.Active = false; lcX7f.Parent = lcV7d
-lbU48(lcb4f, lcV7d)
-local lY18 = Instance.new("Frame"); lY18.Size = UDim2.new(1, 0, 0, 0); lY18.BackgroundTransparency = 1; lY18.AutomaticSize = Enum.AutomaticSize.Y; lY18.LayoutOrder = 2; lY18.Parent = lcb4f
-local lX17 = Instance.new("UIPadding"); lX17.PaddingTop = UDim.new(0, 5); lX17.PaddingBottom = UDim.new(0, 6); lX17.PaddingLeft = UDim.new(0, 6); lX17.PaddingRight = UDim.new(0, 6); lX17.Parent = lY18
-local lV15 = Instance.new("Frame"); lV15.Size = UDim2.new(1, 0, 0, 0); lV15.BackgroundTransparency = 1; lV15.AutomaticSize = Enum.AutomaticSize.Y; lV15.Parent = lY18
-local lW16 = Instance.new("UIListLayout"); lW16.SortOrder = Enum.SortOrder.LayoutOrder; lW16.Padding = UDim.new(0, 5); lW16.Parent = lV15
-local function lba1a(name, titleTxt, order)
-local lcC6a = Instance.new("Frame"); lcC6a.BackgroundColor3 = C.panel; lcC6a.AutomaticSize = Enum.AutomaticSize.Y; lcC6a.Size = UDim2.new(1, 0, 0, 0); lcC6a.LayoutOrder = order; lcC6a.Parent = lV15
-ldb83(lcC6a, 6); ldc84(lcC6a, C.divider, 1)
-local lcq5e = Instance.new("UIPadding"); lcq5e.PaddingTop = UDim.new(0, 6); lcq5e.PaddingBottom = UDim.new(0, 6); lcq5e.PaddingLeft = UDim.new(0, 7); lcq5e.PaddingRight = UDim.new(0, 7); lcq5e.Parent = lcC6a
-local lcE6c = Instance.new("UIListLayout"); lcE6c.SortOrder = Enum.SortOrder.LayoutOrder; lcE6c.Padding = UDim.new(0, 5); lcE6c.Parent = lcC6a
-local lbB35 = Instance.new("Frame"); lbB35.Size = UDim2.new(1, 0, 0, 16); lbB35.BackgroundTransparency = 1; lbB35.LayoutOrder = 1; lbB35.Parent = lcC6a
-local lcD6b = Instance.new("TextLabel"); lcD6b.BackgroundTransparency = 1; lcD6b.Size = UDim2.new(0.65, 0, 1, 0); lcD6b.Text = titleTxt; lcD6b.Font = Enum.Font.GothamBold; lcD6b.TextSize = 11; lcD6b.TextColor3 = C.border; lcD6b.TextXAlignment = Enum.TextXAlignment.Left; lcD6b.Parent = lbB35
-local lcY80 = Instance.new("TextButton"); lcY80.Size = UDim2.new(0, 34, 0, 14); lcY80.Position = UDim2.new(1, -34, 0.5, -7); lcY80.BackgroundColor3 = C.off; lcY80.Text = _0(16,{95,86,86}); lcY80.Font = Enum.Font.GothamBold; lcY80.TextSize = 9; lcY80.TextColor3 = C.text; lcY80.AutoButtonColor = false; lcY80.Parent = lbB35
-ldb83(lcY80, 10)
-local function lbX4b(lOrder, lblTxt, defaultVal)
-local lcB69 = Instance.new("Frame"); lcB69.Size = UDim2.new(1, 0, 0, 18); lcB69.BackgroundTransparency = 1; lcB69.LayoutOrder = lOrder; lcB69.Parent = lcC6a
-local lbJ3d = Instance.new("TextLabel"); lbJ3d.BackgroundTransparency = 1; lbJ3d.Size = UDim2.new(0.58, 0, 1, 0); lbJ3d.Text = lblTxt; lbJ3d.Font = Enum.Font.Gotham; lbJ3d.TextSize = 10; lbJ3d.TextColor3 = C.dim; lbJ3d.TextXAlignment = Enum.TextXAlignment.Left; lbJ3d.Parent = lcB69
-local lLb = Instance.new("TextBox"); lLb.Size = UDim2.new(0.4, 0, 0.83, 0); lLb.Position = UDim2.new(0.59, 0, 0.085, 0); lLb.BackgroundColor3 = C.inputBg; lLb.Text = defaultVal; lLb.Font = Enum.Font.GothamMedium; lLb.TextSize = 10; lLb.TextColor3 = C.text; lLb.ClearTextOnFocus = true; lLb.Parent = lcB69
-ldb83(lLb, 4); ldc84(lLb, C.border, 1)
+local lcd51 = Instance.new("UIListLayout"); lcd51.SortOrder = Enum.SortOrder.LayoutOrder; lcd51.Parent = lcc50
+local lcY80 = Instance.new("Frame"); lcY80.Size = UDim2.new(1, 0, 0, 24); lcY80.BackgroundColor3 = C.panel; lcY80.LayoutOrder = 1; lcY80.Parent = lcc50; lde86(lcY80, 8)
+local lcZ81 = Instance.new("Frame"); lcZ81.Size = UDim2.new(1, 0, 0.5, 0); lcZ81.Position = UDim2.new(0, 0, 0.5, 0); lcZ81.BackgroundColor3 = C.panel; lcZ81.BorderSizePixel = 0; lcZ81.Active = false; lcZ81.Parent = lcY80
+local lda82 = Instance.new("TextLabel"); lda82.BackgroundTransparency = 1; lda82.Size = UDim2.new(1, -8, 1, 0); lda82.Position = UDim2.new(0, 8, 0, 0); lda82.Text = "🚗 Multi Controller"; lda82.Font = Enum.Font.GothamBold; lda82.TextSize = 11; lda82.TextColor3 = C.title; lda82.TextXAlignment = Enum.TextXAlignment.Left; lda82.Active = false; lda82.Parent = lcY80
+lbV49(lcc50, lcY80)
+local lZ19 = Instance.new("Frame"); lZ19.Size = UDim2.new(1, 0, 0, 0); lZ19.BackgroundTransparency = 1; lZ19.AutomaticSize = Enum.AutomaticSize.Y; lZ19.LayoutOrder = 2; lZ19.Parent = lcc50
+local lY18 = Instance.new("UIPadding"); lY18.PaddingTop = UDim.new(0, 5); lY18.PaddingBottom = UDim.new(0, 6); lY18.PaddingLeft = UDim.new(0, 6); lY18.PaddingRight = UDim.new(0, 6); lY18.Parent = lZ19
+local lW16 = Instance.new("Frame"); lW16.Size = UDim2.new(1, 0, 0, 0); lW16.BackgroundTransparency = 1; lW16.AutomaticSize = Enum.AutomaticSize.Y; lW16.Parent = lZ19
+local lX17 = Instance.new("UIListLayout"); lX17.SortOrder = Enum.SortOrder.LayoutOrder; lX17.Padding = UDim.new(0, 5); lX17.Parent = lW16
+local function lbb1b(name, titleTxt, order)
+local lcF6d = Instance.new("Frame"); lcF6d.BackgroundColor3 = C.panel; lcF6d.AutomaticSize = Enum.AutomaticSize.Y; lcF6d.Size = UDim2.new(1, 0, 0, 0); lcF6d.LayoutOrder = order; lcF6d.Parent = lW16
+lde86(lcF6d, 6); ldf87(lcF6d, C.divider, 1)
+local lcs60 = Instance.new("UIPadding"); lcs60.PaddingTop = UDim.new(0, 6); lcs60.PaddingBottom = UDim.new(0, 6); lcs60.PaddingLeft = UDim.new(0, 7); lcs60.PaddingRight = UDim.new(0, 7); lcs60.Parent = lcF6d
+local lcH6f = Instance.new("UIListLayout"); lcH6f.SortOrder = Enum.SortOrder.LayoutOrder; lcH6f.Padding = UDim.new(0, 5); lcH6f.Parent = lcF6d
+local lbC36 = Instance.new("Frame"); lbC36.Size = UDim2.new(1, 0, 0, 16); lbC36.BackgroundTransparency = 1; lbC36.LayoutOrder = 1; lbC36.Parent = lcF6d
+local lcG6e = Instance.new("TextLabel"); lcG6e.BackgroundTransparency = 1; lcG6e.Size = UDim2.new(0.65, 0, 1, 0); lcG6e.Text = titleTxt; lcG6e.Font = Enum.Font.GothamBold; lcG6e.TextSize = 11; lcG6e.TextColor3 = C.border; lcG6e.TextXAlignment = Enum.TextXAlignment.Left; lcG6e.Parent = lbC36
+local ldb83 = Instance.new("TextButton"); ldb83.Size = UDim2.new(0, 34, 0, 14); ldb83.Position = UDim2.new(1, -34, 0.5, -7); ldb83.BackgroundColor3 = C.off; ldb83.Text = _0(32,{111,102,102}); ldb83.Font = Enum.Font.GothamBold; ldb83.TextSize = 9; ldb83.TextColor3 = C.text; ldb83.AutoButtonColor = false; ldb83.Parent = lbC36
+lde86(ldb83, 10)
+local function lbY4c(lOrder, lblTxt, defaultVal)
+local lcE6c = Instance.new("Frame"); lcE6c.Size = UDim2.new(1, 0, 0, 18); lcE6c.BackgroundTransparency = 1; lcE6c.LayoutOrder = lOrder; lcE6c.Parent = lcF6d
+local lbK3e = Instance.new("TextLabel"); lbK3e.BackgroundTransparency = 1; lbK3e.Size = UDim2.new(0.58, 0, 1, 0); lbK3e.Text = lblTxt; lbK3e.Font = Enum.Font.Gotham; lbK3e.TextSize = 10; lbK3e.TextColor3 = C.dim; lbK3e.TextXAlignment = Enum.TextXAlignment.Left; lbK3e.Parent = lcE6c
+local lLb = Instance.new("TextBox"); lLb.Size = UDim2.new(0.4, 0, 0.83, 0); lLb.Position = UDim2.new(0.59, 0, 0.085, 0); lLb.BackgroundColor3 = C.inputBg; lLb.Text = defaultVal; lLb.Font = Enum.Font.GothamMedium; lLb.TextSize = 10; lLb.TextColor3 = C.text; lLb.ClearTextOnFocus = true; lLb.Parent = lcE6c
+lde86(lLb, 4); ldf87(lLb, C.border, 1)
 return lLb
 end
-local function lca4e(lOrder, lblTxt, defaultState, callback)
-local lcB69 = Instance.new("Frame"); lcB69.Size = UDim2.new(1, 0, 0, 18); lcB69.BackgroundTransparency = 1; lcB69.LayoutOrder = lOrder; lcB69.Parent = lcC6a
-local lbJ3d = Instance.new("TextLabel"); lbJ3d.BackgroundTransparency = 1; lbJ3d.Size = UDim2.new(0.58, 0, 1, 0); lbJ3d.Text = lblTxt; lbJ3d.Font = Enum.Font.Gotham; lbJ3d.TextSize = 10; lbJ3d.TextColor3 = C.dim; lbJ3d.TextXAlignment = Enum.TextXAlignment.Left; lbJ3d.Parent = lcB69
-local lMc = Instance.new("TextButton"); lMc.Size = UDim2.new(0.4, 0, 0.83, 0); lMc.Position = UDim2.new(0.59, 0, 0.085, 0); lMc.BackgroundColor3 = defaultState and C.on or C.off; lMc.Text = defaultState and _0(55,{134,133}) or _0(16,{95,86,86}); lMc.Font = Enum.Font.GothamBold; lMc.TextSize = 9; lMc.TextColor3 = C.text; lMc.Parent = lcB69
-ldb83(lMc, 4)
-local lbb1b = defaultState
+local function lcb4f(lOrder, lblTxt, defaultState, callback)
+local lcE6c = Instance.new("Frame"); lcE6c.Size = UDim2.new(1, 0, 0, 18); lcE6c.BackgroundTransparency = 1; lcE6c.LayoutOrder = lOrder; lcE6c.Parent = lcF6d
+local lbK3e = Instance.new("TextLabel"); lbK3e.BackgroundTransparency = 1; lbK3e.Size = UDim2.new(0.58, 0, 1, 0); lbK3e.Text = lblTxt; lbK3e.Font = Enum.Font.Gotham; lbK3e.TextSize = 10; lbK3e.TextColor3 = C.dim; lbK3e.TextXAlignment = Enum.TextXAlignment.Left; lbK3e.Parent = lcE6c
+local lMc = Instance.new("TextButton"); lMc.Size = UDim2.new(0.4, 0, 0.83, 0); lMc.Position = UDim2.new(0.59, 0, 0.085, 0); lMc.BackgroundColor3 = defaultState and C.on or C.off; lMc.Text = defaultState and _0(57,{136,135}) or _0(32,{111,102,102}); lMc.Font = Enum.Font.GothamBold; lMc.TextSize = 9; lMc.TextColor3 = C.text; lMc.Parent = lcE6c
+lde86(lMc, 4)
+local lbc1c = defaultState
 lMc.MouseButton1Click:Connect(function()
-lbb1b = not lbb1b; lMc.Text = lbb1b and _0(55,{134,133}) or _0(16,{95,86,86})
-TweenService:Create(lMc, TweenInfo.new(0.2), { BackgroundColor3 = lbb1b and C.on or C.off }):Play()
-if callback then callback(lbb1b) end
+lbc1c = not lbc1c; lMc.Text = lbc1c and _0(57,{136,135}) or _0(32,{111,102,102})
+TweenService:Create(lMc, TweenInfo.new(0.2), { BackgroundColor3 = lbc1c and C.on or C.off }):Play()
+if callback then callback(lbc1c) end
 end)
 end
-local lE4 = Instance.new("TextButton"); lE4.Size = UDim2.new(1, 0, 0, 16); lE4.BackgroundColor3 = C.apply; lE4.Text = _0(41,{106,153,149,146,140,138,155}); lE4.Font = Enum.Font.GothamBold; lE4.TextSize = 10; lE4.TextColor3 = C.text; lE4.LayoutOrder = 10; lE4.Parent = lcC6a; ldb83(lE4, 4)
-local function lbq2a(color)
+local lE4 = Instance.new("TextButton"); lE4.Size = UDim2.new(1, 0, 0, 16); lE4.BackgroundColor3 = C.apply; lE4.Text = _0(26,{91,138,134,131,125,123,140}); lE4.Font = Enum.Font.GothamBold; lE4.TextSize = 10; lE4.TextColor3 = C.text; lE4.LayoutOrder = 10; lE4.Parent = lcF6d; lde86(lE4, 4)
+local function lbr2b(color)
 TweenService:Create(lE4, TweenInfo.new(0.1), { BackgroundColor3 = color }):Play()
 task.delay(0.4, function() TweenService:Create(lE4, TweenInfo.new(0.2), { BackgroundColor3 = C.apply }):Play() end)
 end
-return lcC6a, lcY80, lbX4b, lca4e, lE4, lbq2a
+return lcF6d, ldb83, lbY4c, lcb4f, lE4, lbr2b
 end
-local _, lbl25, lbV49, _, lbh21, lbi22 = lba1a("Drift", "💨 Drift Config", 1)
-local lbx31 = lbV49(2, _0(17,{87,131,122,116,133,122,128,127,49,57,87,64,99,58}), _0(26,{74,72,77,74}))
-local lbz33 = lbV49(3, _0(21,{91,135,126,120,137,67,53,108,122,126,124,125,137}), _0(55,{108}))
-local function ldd85(val)
-lbk24.front.enabled, lbk24.rear.enabled = val, val
-lbl25.Text = val and _0(55,{134,133}) or _0(16,{95,86,86})
-TweenService:Create(lbl25, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
+local _, lbm26, lbW4a, _, lbi22, lbj23 = lbb1b("Drift", "💨 Drift Config", 1)
+local lby32 = lbW4a(2, _0(43,{113,157,148,142,159,148,154,153,75,83,113,90,125,84}), _0(25,{73,71,76,73}))
+local lbA34 = lbW4a(3, _0(15,{85,129,120,114,131,61,47,102,116,120,118,119,131}), _0(22,{75}))
+local function ldg88(val)
+lbl25.front.enabled, lbl25.rear.enabled = val, val
+lbm26.Text = val and _0(57,{136,135}) or _0(32,{111,102,102})
+TweenService:Create(lbm26, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
 end
-lbl25.MouseButton1Click:Connect(function()
-local lck58 = not lbk24.front.enabled
-ldd85(lck58)
-if lck58 then
-local f, lby32 = lcr5f(lbx31.Text), lcr5f(lbz33.Text)
-if f and lby32 then lF5("front", f, lby32); lF5("rear", f, lby32) end
+lbm26.MouseButton1Click:Connect(function()
+local lcm5a = not lbl25.front.enabled
+ldg88(lcm5a)
+if lcm5a then
+local f, lbz33 = lct61(lby32.Text), lct61(lbA34.Text)
+if f and lbz33 then lF5("front", f, lbz33); lF5("rear", f, lbz33) end
 else
-lcz67("front"); lcz67("rear")
+lcC6a("front"); lcC6a("rear")
 end
 end)
-lbh21.MouseButton1Click:Connect(function()
-local f, lby32 = lcr5f(lbx31.Text), lcr5f(lbz33.Text)
-if not f or not lby32 or not lbc1c then lbi22(C.red) return end
-if not lbk24.front.enabled then ldd85(true) end
-local lcm5a, lcn5b = lF5("front", f, lby32), lF5("rear", f, lby32)
-lbi22((lcm5a and lcn5b) and C.green or C.red)
+lbi22.MouseButton1Click:Connect(function()
+local f, lbz33 = lct61(lby32.Text), lct61(lbA34.Text)
+if not f or not lbz33 or not lbd1d then lbj23(C.red) return end
+if not lbl25.front.enabled then ldg88(true) end
+local lco5c, lcp5d = lF5("front", f, lbz33), lF5("rear", f, lbz33)
+lbj23((lco5c and lcp5d) and C.green or C.red)
 end)
-lcF6d.drift = { setToggle = ldd85 }
-local _, lcj57, lbW4a, _, lcg54, lch55 = lba1a("Motor", "⚙️ Motor (W/S)", 2)
-local ldi8a = lbW4a(2, _0(41,{127,142,149,152,140,146,141,138,141,142}), _0(57,{106,111,105}))
-local lda82 = lbW4a(3, _0(48,{118,159,162,243,215,145,80,88,132,159,162,161,165,149,89}), _0(54,{109,102,102,102}))
-local function lde86(val)
-lci56.enabled = val
-lcj57.Text = val and _0(55,{134,133}) or _0(16,{95,86,86})
-TweenService:Create(lcj57, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
+lcI70.drift = { setToggle = ldg88 }
+local _, lck58, lbX4b, _, lch55, lci56 = lbb1b("Motor", "⚙️ Motor (W/S)", 2)
+local ldl8d = lbX4b(2, _0(60,{146,161,168,171,159,165,160,157,160,161}), _0(33,{82,87,81}))
+local ldd85 = lbX4b(3, _0(37,{107,148,151,232,204,134,69,77,121,148,151,150,154,138,78}), _0(24,{79,72,72,72}))
+local function ldh89(val)
+lcj57.enabled = val
+lck58.Text = val and _0(57,{136,135}) or _0(32,{111,102,102})
+TweenService:Create(lck58, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
 end
-lcj57.MouseButton1Click:Connect(function() lde86(not lci56.enabled) end)
-lcg54.MouseButton1Click:Connect(function()
-local v, t = lcr5f(ldi8a.Text), lcr5f(lda82.Text)
-if not v or not t then lch55(C.red) return end
-lci56.maxVel, lci56.maxTorque = v, t
-if not lci56.enabled then lde86(true) end
-lch55(C.green)
+lck58.MouseButton1Click:Connect(function() ldh89(not lcj57.enabled) end)
+lch55.MouseButton1Click:Connect(function()
+local v, t = lct61(ldl8d.Text), lct61(ldd85.Text)
+if not v or not t then lci56(C.red) return end
+lcj57.maxVel, lcj57.maxTorque = v, t
+if not lcj57.enabled then ldh89(true) end
+lci56(C.green)
 end)
-lcF6d.motor = { setToggle = lde86 }
-local _, lcR79, lbY4c, lbZ4d, lcN75, lcP77 = lba1a("Steer", "🔄 Direção (A/D)", 3)
-local lC2 = lbY4c(2, _0(33,{110,130,153,65,98,143,136,141,134}), _0(55,{103,101,108}))
-local lcK72 = lbY4c(3, _0(56,{139,172,157,157,170,88,139,168,157,157,156}), _0(55,{108}))
-lbZ4d(4, _0(49,{114,166,165,160,94,114,157,154,159,153,146,163}), false, function(state) lcQ78.autoAlign = state end)
-local function ldf87(val)
-lcQ78.enabled = val
-lcR79.Text = val and _0(55,{134,133}) or _0(16,{95,86,86})
-TweenService:Create(lcR79, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
+lcI70.motor = { setToggle = ldh89 }
+local _, lcU7c, lbZ4d, lca4e, lcQ78, lcS7a = lbb1b("Steer", "🔄 Direção (A/D)", 3)
+local lC2 = lbZ4d(2, _0(50,{127,147,170,82,115,160,153,158,151}), _0(35,{83,81,88}))
+local lcN75 = lbZ4d(3, _0(25,{108,141,126,126,139,57,108,137,126,126,125}), _0(22,{75}))
+lca4e(4, _0(45,{110,162,161,156,90,110,153,150,155,149,142,159}), false, function(state) lcT7b.autoAlign = state end)
+local function ldi8a(val)
+lcT7b.enabled = val
+lcU7c.Text = val and _0(57,{136,135}) or _0(32,{111,102,102})
+TweenService:Create(lcU7c, TweenInfo.new(0.2), { BackgroundColor3 = val and C.on or C.off }):Play()
 end
-lcR79.MouseButton1Click:Connect(function() ldf87(not lcQ78.enabled) end)
-lcN75.MouseButton1Click:Connect(function()
-local a, s = lcr5f(lC2.Text), lcr5f(lcK72.Text)
-if not a or not s then lcP77(C.red) return end
-lcQ78.maxAngle, lcQ78.speed = a, s
-if not lcQ78.enabled then ldf87(true) end
-lcP77(C.green)
+lcU7c.MouseButton1Click:Connect(function() ldi8a(not lcT7b.enabled) end)
+lcQ78.MouseButton1Click:Connect(function()
+local a, s = lct61(lC2.Text), lct61(lcN75.Text)
+if not a or not s then lcS7a(C.red) return end
+lcT7b.maxAngle, lcT7b.speed = a, s
+if not lcT7b.enabled then ldi8a(true) end
+lcS7a(C.green)
 end)
-lcF6d.steer = { setToggle = ldf87 }
-if lbF39 then
-local lce52 = Instance.new("Frame")
-lce52.BackgroundColor3 = C.panel; lce52.AutomaticSize = Enum.AutomaticSize.Y
-lce52.Size = UDim2.new(1, 0, 0, 0); lce52.LayoutOrder = 4; lce52.Parent = lV15
-ldb83(lce52, 6); ldc84(lce52, C.divider, 1)
-local lbR45 = Instance.new("UIPadding"); lbR45.PaddingTop = UDim.new(0, 6); lbR45.PaddingBottom = UDim.new(0, 6); lbR45.PaddingLeft = UDim.new(0, 7); lbR45.PaddingRight = UDim.new(0, 7); lbR45.Parent = lce52
-local lbQ44 = Instance.new("UIListLayout"); lbQ44.SortOrder = Enum.SortOrder.LayoutOrder; lbQ44.Padding = UDim.new(0, 5); lbQ44.Parent = lce52
-local lbP43 = Instance.new("Frame"); lbP43.Size = UDim2.new(1, 0, 0, 16); lbP43.BackgroundTransparency = 1; lbP43.LayoutOrder = 1; lbP43.Parent = lce52
-local lbT47 = Instance.new("TextLabel"); lbT47.BackgroundTransparency = 1; lbT47.Size = UDim2.new(1, 0, 1, 0); lbT47.Text = "📱 Mobile Config"; lbT47.Font = Enum.Font.GothamBold; lbT47.TextSize = 11; lbT47.TextColor3 = C.border; lbT47.TextXAlignment = Enum.TextXAlignment.Left; lbT47.Parent = lbP43
-local function lbS46(lOrder, lblTxt, defaultVal)
-local lcB69 = Instance.new("Frame"); lcB69.Size = UDim2.new(1, 0, 0, 18); lcB69.BackgroundTransparency = 1; lcB69.LayoutOrder = lOrder; lcB69.Parent = lce52
-local lbJ3d = Instance.new("TextLabel"); lbJ3d.BackgroundTransparency = 1; lbJ3d.Size = UDim2.new(0.58, 0, 1, 0); lbJ3d.Text = lblTxt; lbJ3d.Font = Enum.Font.Gotham; lbJ3d.TextSize = 10; lbJ3d.TextColor3 = C.dim; lbJ3d.TextXAlignment = Enum.TextXAlignment.Left; lbJ3d.Parent = lcB69
-local lLb = Instance.new("TextBox"); lLb.Size = UDim2.new(0.4, 0, 0.83, 0); lLb.Position = UDim2.new(0.59, 0, 0.085, 0); lLb.BackgroundColor3 = C.inputBg; lLb.Text = defaultVal; lLb.Font = Enum.Font.GothamMedium; lLb.TextSize = 10; lLb.TextColor3 = C.text; lLb.ClearTextOnFocus = true; lLb.Parent = lcB69
-ldb83(lLb, 4); ldc84(lLb, C.border, 1)
+lcI70.steer = { setToggle = ldi8a }
+if lbG3a then
+local lcf53 = Instance.new("Frame")
+lcf53.BackgroundColor3 = C.panel; lcf53.AutomaticSize = Enum.AutomaticSize.Y
+lcf53.Size = UDim2.new(1, 0, 0, 0); lcf53.LayoutOrder = 4; lcf53.Parent = lW16
+lde86(lcf53, 6); ldf87(lcf53, C.divider, 1)
+local lbS46 = Instance.new("UIPadding"); lbS46.PaddingTop = UDim.new(0, 6); lbS46.PaddingBottom = UDim.new(0, 6); lbS46.PaddingLeft = UDim.new(0, 7); lbS46.PaddingRight = UDim.new(0, 7); lbS46.Parent = lcf53
+local lbR45 = Instance.new("UIListLayout"); lbR45.SortOrder = Enum.SortOrder.LayoutOrder; lbR45.Padding = UDim.new(0, 5); lbR45.Parent = lcf53
+local lbQ44 = Instance.new("Frame"); lbQ44.Size = UDim2.new(1, 0, 0, 16); lbQ44.BackgroundTransparency = 1; lbQ44.LayoutOrder = 1; lbQ44.Parent = lcf53
+local lbU48 = Instance.new("TextLabel"); lbU48.BackgroundTransparency = 1; lbU48.Size = UDim2.new(1, 0, 1, 0); lbU48.Text = "📱 Mobile Config"; lbU48.Font = Enum.Font.GothamBold; lbU48.TextSize = 11; lbU48.TextColor3 = C.border; lbU48.TextXAlignment = Enum.TextXAlignment.Left; lbU48.Parent = lbQ44
+local function lbT47(lOrder, lblTxt, defaultVal)
+local lcE6c = Instance.new("Frame"); lcE6c.Size = UDim2.new(1, 0, 0, 18); lcE6c.BackgroundTransparency = 1; lcE6c.LayoutOrder = lOrder; lcE6c.Parent = lcf53
+local lbK3e = Instance.new("TextLabel"); lbK3e.BackgroundTransparency = 1; lbK3e.Size = UDim2.new(0.58, 0, 1, 0); lbK3e.Text = lblTxt; lbK3e.Font = Enum.Font.Gotham; lbK3e.TextSize = 10; lbK3e.TextColor3 = C.dim; lbK3e.TextXAlignment = Enum.TextXAlignment.Left; lbK3e.Parent = lcE6c
+local lLb = Instance.new("TextBox"); lLb.Size = UDim2.new(0.4, 0, 0.83, 0); lLb.Position = UDim2.new(0.59, 0, 0.085, 0); lLb.BackgroundColor3 = C.inputBg; lLb.Text = defaultVal; lLb.Font = Enum.Font.GothamMedium; lLb.TextSize = 10; lLb.TextColor3 = C.text; lLb.ClearTextOnFocus = true; lLb.Parent = lcE6c
+lde86(lLb, 4); ldf87(lLb, C.border, 1)
 return lLb
 end
-local lcI70 = lbS46(2, _0(28,{112,125,137,74,60,94,139,144,223,209,129,143,60,68,140,148,69}), tostring(lcf53.btnSize))
-local lbN41 = Instance.new("Frame"); lbN41.Size = UDim2.new(1, 0, 0, 18); lbN41.BackgroundTransparency = 1; lbN41.LayoutOrder = 3; lbN41.Parent = lce52
-local lbM40 = Instance.new("TextLabel"); lbM40.BackgroundTransparency = 1; lbM40.Size = UDim2.new(0.58, 0, 1, 0); lbM40.Text = _0(18,{102,132,115,136,115,132,50,98,129,133,123,213,185,213,181,129}); lbM40.Font = Enum.Font.Gotham; lbM40.TextSize = 10; lbM40.TextColor3 = C.dim; lbM40.TextXAlignment = Enum.TextXAlignment.Left; lbM40.Parent = lbN41
-local lbL3f = Instance.new("TextButton"); lbL3f.Size = UDim2.new(0.4, 0, 0.83, 0); lbL3f.Position = UDim2.new(0.59, 0, 0.085, 0); lbL3f.BackgroundColor3 = C.off; lbL3f.Text = _0(16,{95,86,86}); lbL3f.Font = Enum.Font.GothamBold; lbL3f.TextSize = 9; lbL3f.TextColor3 = C.text; lbL3f.Parent = lbN41
-ldb83(lbL3f, 4)
-local lbO42 = Instance.new("TextButton"); lbO42.Size = UDim2.new(1, 0, 0, 16); lbO42.BackgroundColor3 = C.apply; lbO42.Text = _0(41,{106,153,149,146,140,138,155}); lbO42.Font = Enum.Font.GothamBold; lbO42.TextSize = 10; lbO42.TextColor3 = C.text; lbO42.LayoutOrder = 10; lbO42.Parent = lce52; ldb83(lbO42, 4)
-local function lbr2b(color)
-TweenService:Create(lbO42, TweenInfo.new(0.1), { BackgroundColor3 = color }):Play()
-task.delay(0.4, function() TweenService:Create(lbO42, TweenInfo.new(0.2), { BackgroundColor3 = C.apply }):Play() end)
+local lcL73 = lbT47(2, _0(39,{123,136,148,85,71,105,150,155,234,220,140,154,71,79,151,159,80}), tostring(lcg54.btnSize))
+local lbO42 = Instance.new("Frame"); lbO42.Size = UDim2.new(1, 0, 0, 18); lbO42.BackgroundTransparency = 1; lbO42.LayoutOrder = 3; lbO42.Parent = lcf53
+local lbN41 = Instance.new("TextLabel"); lbN41.BackgroundTransparency = 1; lbN41.Size = UDim2.new(0.58, 0, 1, 0); lbN41.Text = _0(17,{101,131,114,135,114,131,49,97,128,132,122,212,184,212,180,128}); lbN41.Font = Enum.Font.Gotham; lbN41.TextSize = 10; lbN41.TextColor3 = C.dim; lbN41.TextXAlignment = Enum.TextXAlignment.Left; lbN41.Parent = lbO42
+local lbM40 = Instance.new("TextButton"); lbM40.Size = UDim2.new(0.4, 0, 0.83, 0); lbM40.Position = UDim2.new(0.59, 0, 0.085, 0); lbM40.BackgroundColor3 = C.on; lbM40.Text = _0(57,{136,135}); lbM40.Font = Enum.Font.GothamBold; lbM40.TextSize = 9; lbM40.TextColor3 = C.text; lbM40.Parent = lbO42
+lde86(lbM40, 4)
+local lbP43 = Instance.new("TextButton"); lbP43.Size = UDim2.new(1, 0, 0, 16); lbP43.BackgroundColor3 = C.apply; lbP43.Text = _0(26,{91,138,134,131,125,123,140}); lbP43.Font = Enum.Font.GothamBold; lbP43.TextSize = 10; lbP43.TextColor3 = C.text; lbP43.LayoutOrder = 10; lbP43.Parent = lcf53; lde86(lbP43, 4)
+local function lbs2c(color)
+TweenService:Create(lbP43, TweenInfo.new(0.1), { BackgroundColor3 = color }):Play()
+task.delay(0.4, function() TweenService:Create(lbP43, TweenInfo.new(0.2), { BackgroundColor3 = C.apply }):Play() end)
 end
-lbL3f.MouseButton1Click:Connect(function()
-lcf53.locked = not lcf53.locked
-lbL3f.Text = lcf53.locked and _0(55,{134,133}) or _0(16,{95,86,86})
-TweenService:Create(lbL3f, TweenInfo.new(0.2), { BackgroundColor3 = lcf53.locked and C.on or C.off }):Play()
-local lKa = lcf53.locked and C.mobileLocked or C.border
-for _, lbu2e in pairs(lcf53.btnRefs) do
-if lbu2e and lbu2e:IsA("Frame") then
-local s = lbu2e:FindFirstChildWhichIsA("UIStroke")
+lbM40.MouseButton1Click:Connect(function()
+lcg54.locked = not lcg54.locked
+lbM40.Text = lcg54.locked and _0(57,{136,135}) or _0(32,{111,102,102})
+TweenService:Create(lbM40, TweenInfo.new(0.2), { BackgroundColor3 = lcg54.locked and C.on or C.off }):Play()
+local lKa = lcg54.locked and C.mobileLocked or C.border
+for _, lbv2f in pairs(lcg54.btnRefs) do
+if lbv2f and lbv2f:IsA("Frame") then
+local s = lbv2f:FindFirstChildWhichIsA("UIStroke")
 if s then TweenService:Create(s, TweenInfo.new(0.25), { Color = lKa }):Play() end
 end
 end
 end)
-lbO42.MouseButton1Click:Connect(function()
-local lcT7b = lcr5f(lcI70.Text)
-if not lcT7b or lcT7b < 24 or lcT7b > 160 then lbr2b(C.red) return end
-lcf53.btnSize = lcT7b
-for _, lbu2e in pairs(lcf53.btnRefs) do
-if lbu2e and lbu2e:IsA("Frame") then
-lbu2e.Size = UDim2.new(0, lcT7b, 0, lcT7b)
-local lMc = lbu2e:FindFirstChildWhichIsA("TextButton")
-if lMc then lMc.TextSize = math.floor(lcT7b * 0.40) end
+lbP43.MouseButton1Click:Connect(function()
+local lcW7e = lct61(lcL73.Text)
+if not lcW7e or lcW7e < 24 or lcW7e > 160 then lbs2c(C.red) return end
+lcg54.btnSize = lcW7e
+for _, lbv2f in pairs(lcg54.btnRefs) do
+if lbv2f and lbv2f:IsA("Frame") then
+lbv2f.Size = UDim2.new(0, lcW7e, 0, lcW7e)
+local lMc = lbv2f:FindFirstChildWhichIsA("TextButton")
+if lMc then lMc.TextSize = math.floor(lcW7e * 0.40) end
 end
 end
-lbr2b(C.green)
+lbs2c(C.green)
 end)
 end
-if lbF39 then
-local function lZ19(icon, labelTxt, defaultPos)
-local lcT7b = lcf53.btnSize
-local lbu2e = Instance.new("Frame")
-lbu2e.Size = UDim2.new(0, lcT7b, 0, lcT7b)
-lbu2e.Position = defaultPos
-lbu2e.BackgroundColor3 = C.mobileBg
-lbu2e.BackgroundTransparency = 0.15
-lbu2e.ZIndex = 10
-lbu2e.Active = true
-lbu2e.Parent = lcH6f
-ldb83(lbu2e, 12)
-ldc84(lbu2e, C.border, 2)
+if lbG3a then
+local function lba1a(icon, labelTxt, defaultPos)
+local lcW7e = lcg54.btnSize
+local lbv2f = Instance.new("Frame")
+lbv2f.Size = UDim2.new(0, lcW7e, 0, lcW7e)
+lbv2f.Position = defaultPos
+lbv2f.BackgroundColor3 = C.mobileBg
+lbv2f.BackgroundTransparency = 0.15
+lbv2f.ZIndex = 10
+lbv2f.Active = true
+lbv2f.Parent = lcK72
+lde86(lbv2f, 12)
+ldf87(lbv2f, lcg54.locked and C.mobileLocked or C.border, 2)
 local lMc = Instance.new("TextButton")
 lMc.Size = UDim2.new(1, 0, 1, 0)
 lMc.BackgroundTransparency = 1
 lMc.Text = icon
 lMc.Font = Enum.Font.GothamBold
-lMc.TextSize = math.floor(lcT7b * 0.40)
+lMc.TextSize = math.floor(lcW7e * 0.40)
 lMc.TextColor3 = C.text
 lMc.ZIndex = 11
 lMc.AutoButtonColor = false
 lMc.Active = false
-lMc.Parent = lbu2e
-ldb83(lMc, 12)
+lMc.Parent = lbv2f
+lde86(lMc, 12)
 if labelTxt then
-local lbJ3d = Instance.new("TextLabel")
-lbJ3d.Size = UDim2.new(1, 0, 0, 11)
-lbJ3d.Position = UDim2.new(0, 0, 0.67, 0)
-lbJ3d.BackgroundTransparency = 1
-lbJ3d.Text = labelTxt
-lbJ3d.Font = Enum.Font.Gotham
-lbJ3d.TextSize = 8
-lbJ3d.TextColor3 = C.mobileLabel
-lbJ3d.ZIndex = 12
-lbJ3d.Active = false
-lbJ3d.Parent = lbu2e
+local lbK3e = Instance.new("TextLabel")
+lbK3e.Size = UDim2.new(1, 0, 0, 11)
+lbK3e.Position = UDim2.new(0, 0, 0.67, 0)
+lbK3e.BackgroundTransparency = 1
+lbK3e.Text = labelTxt
+lbK3e.Font = Enum.Font.Gotham
+lbK3e.TextSize = 8
+lbK3e.TextColor3 = C.mobileLabel
+lbK3e.ZIndex = 12
+lbK3e.Active = false
+lbK3e.Parent = lbv2f
 end
-return lbu2e, lMc
+return lbv2f, lMc
 end
-local lbw30, lbv2f = lZ19("▲", _0(58,{128,172,159,168,174,159}), UDim2.new(0.82, 0, 0.70, 0))
-local lcw64, lcv63 = lZ19("▼", _0(60,{142,255,229}), UDim2.new(0.82, 0, 0.87, 0))
-local lbo28, lbn27 = lZ19("◀", _0(19,{88,134,132}), UDim2.new(0.71, 0, 0.78, 0))
-local lbe1e, lbd1d = lZ19("▶", _0(25,{93,130,139}), UDim2.new(0.93, 0, 0.78, 0))
-lcf53.btnRefs.frente = lbw30
-lcf53.btnRefs.re = lcw64
-lcf53.btnRefs.esq = lbo28
-lcf53.btnRefs.dir = lbe1e
-local function lcG6e(lbu2e, onPress, onRelease)
-local lB1 = nil
-local lbg20 = false
-local lbG3a = false
-local lbf1f = nil
-local lcL73 = nil
-local lcu62 = false
-lbu2e.InputBegan:Connect(function(i)
-local lbI3c = i.UserInputType == Enum.UserInputType.Touch
-local lbE38 = i.UserInputType == Enum.UserInputType.MouseButton1
-if not lbI3c and not lbE38 then return end
-if lbg20 or lcu62 then return end
-lbG3a = lbE38
-lB1 = lbI3c and i or nil
-if lcf53.locked then
-lcu62 = true
-if onPress then onPress() end
-TweenService:Create(lbu2e, TweenInfo.new(0.08), { BackgroundTransparency = 0 }):Play()
-else
-lbg20 = true
-lbf1f = Vector2.new(i.Position.X, i.Position.Y)
-lcL73 = lbu2e.Position
+local lbx31, lbw30 = lba1a("▲", _0(22,{92,136,123,132,138,123}), UDim2.new(0.82, 0, 0.70, 0))
+local lcy66, lcx65 = lba1a("▼", _0(48,{130,243,217}), UDim2.new(0.82, 0, 0.87, 0))
+local lbp29, lbo28 = lba1a("◀", _0(55,{124,170,168}), UDim2.new(0.71, 0, 0.78, 0))
+local lbf1f, lbe1e = lba1a("▶", _0(26,{94,131,140}), UDim2.new(0.93, 0, 0.78, 0))
+lcg54.btnRefs.frente = lbx31
+lcg54.btnRefs.re = lcy66
+lcg54.btnRefs.esq = lbp29
+lcg54.btnRefs.dir = lbf1f
+local function lcJ71(lbv2f, onPress, onRelease)
+lbv2f.InputBegan:Connect(function(i)
+local lbJ3d = i.UserInputType == Enum.UserInputType.Touch
+local lbF39 = i.UserInputType == Enum.UserInputType.MouseButton1
+if not lbJ3d and not lbF39 then return end
+local lbH3b = lbF39
+local lbg20 = Vector2.new(i.Position.X, i.Position.Y)
+local lcO76 = lbv2f.Position
+local lbh21 = false
+local lcw64 = false
+local lcl59 = nil
+local lbn27 = nil
+local function lPf()
+if lcl59 then lcl59:Disconnect(); lcl59 = nil end
+if lbn27 then lbn27:Disconnect(); lbn27 = nil end
 end
-end)
-local lNd = UserInputService.InputChanged:Connect(function(i)
-if not lbg20 then return end
-if lbG3a then
-if i.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-else
-if i ~= lB1 then return end
-end
-local d = Vector2.new(i.Position.X, i.Position.Y) - lbf1f
-lbu2e.Position = UDim2.new(
-lcL73.X.Scale, lcL73.X.Offset + d.X,
-lcL73.Y.Scale, lcL73.Y.Offset + d.Y
-)
-end)
-table.insert(lT13, lNd)
-local lOe = UserInputService.InputEnded:Connect(function(i)
-local lbm26 = false
-if lbG3a then
-lbm26 = (i.UserInputType == Enum.UserInputType.MouseButton1)
-else
-lbm26 = (i == lB1)
-end
-if not lbm26 then return end
-lB1 = nil
-if lcu62 then
-lcu62 = false
+local function lcA68()
+lPf()
+if lcw64 then
+lcw64 = false
 if onRelease then onRelease() end
-TweenService:Create(lbu2e, TweenInfo.new(0.08), { BackgroundTransparency = 0.15 }):Play()
-elseif lbg20 then
-lbg20 = false
+TweenService:Create(lbv2f, TweenInfo.new(0.08), { BackgroundTransparency = 0.15 }):Play()
+end
+lbh21 = false
+end
+if lcg54.locked then
+lcw64 = true
+if onPress then onPress() end
+TweenService:Create(lbv2f, TweenInfo.new(0.08), { BackgroundTransparency = 0 }):Play()
+else
+lbh21 = true
+end
+if not lcg54.locked then
+lcl59 = UserInputService.InputChanged:Connect(function(ch)
+if not lbh21 then return end
+if lbH3b then
+if ch.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+else
+if ch ~= i then return end
+end
+local d = Vector2.new(ch.Position.X, ch.Position.Y) - lbg20
+lbv2f.Position = UDim2.new(
+lcO76.X.Scale, lcO76.X.Offset + d.X,
+lcO76.Y.Scale, lcO76.Y.Offset + d.Y
+)
+end)
+end
+lbn27 = UserInputService.InputEnded:Connect(function(ended)
+local match = false
+if lbH3b then
+match = (ended.UserInputType == Enum.UserInputType.MouseButton1)
+else
+match = (ended == i)
+end
+if match then
+lcA68()
 end
 end)
-table.insert(lT13, lOe)
+end)
 end
-lcG6e(lbw30,
+lcJ71(lbx31,
 function()
-if not lci56.enabled or not lbH3b(lbc1c) then return end
-lci56.currentDir = _0(58,{128,172,159,168,174,159}); lD3(_0(58,{128,172,159,168,174,159}))
+if not lbI3c(lbd1d) then return end
+if not lcj57.enabled then
+lcj57.enabled = true
+if lcI70.motor then lcI70.motor.setToggle(true) end
+end
+lcj57.currentDir = _0(22,{92,136,123,132,138,123}); lD3(_0(22,{92,136,123,132,138,123}))
 end,
-function() lci56.currentDir = _0(31,{111,128,145,128,145}); lD3(_0(31,{111,128,145,128,145})) end
+function() lcj57.currentDir = _0(56,{136,153,170,153,170}); lD3(_0(56,{136,153,170,153,170})) end
 )
-lcG6e(lcw64,
+lcJ71(lcy66,
 function()
-if not lci56.enabled or not lbH3b(lbc1c) then return end
-lci56.currentDir = _0(59,{141,160}); lD3(_0(59,{141,160}))
+if not lbI3c(lbd1d) then return end
+if not lcj57.enabled then
+lcj57.enabled = true
+if lcI70.motor then lcI70.motor.setToggle(true) end
+end
+lcj57.currentDir = _0(41,{123,142}); lD3(_0(41,{123,142}))
 end,
-function() lci56.currentDir = _0(31,{111,128,145,128,145}); lD3(_0(31,{111,128,145,128,145})) end
+function() lcj57.currentDir = _0(56,{136,153,170,153,170}); lD3(_0(56,{136,153,170,153,170})) end
 )
-lcG6e(lbo28,
-function() if lcQ78.enabled then lcQ78.isA = true end end,
-function() lcQ78.isA = false end
+lcJ71(lbp29,
+function()
+if not lcT7b.enabled then
+lcT7b.enabled = true
+if lcI70.steer then lcI70.steer.setToggle(true) end
+end
+lcT7b.isA = true
+end,
+function() lcT7b.isA = false end
 )
-lcG6e(lbe1e,
-function() if lcQ78.enabled then lcQ78.isD = true end end,
-function() lcQ78.isD = false end
+lcJ71(lbf1f,
+function()
+if not lcT7b.enabled then
+lcT7b.enabled = true
+if lcI70.steer then lcI70.steer.setToggle(true) end
+end
+lcT7b.isD = true
+end,
+function() lcT7b.isD = false end
 )
 end
-local lcd51 = false
-lcZ81.MouseButton1Click:Connect(function()
-lcd51 = not lcd51
-lcb4f.Visible = lcd51
-lcZ81.Text = lcd51 and "✕ Fechar" or "⚙ Painel"
+local lce52 = false
+ldc84.MouseButton1Click:Connect(function()
+lce52 = not lce52
+lcc50.Visible = lce52
+ldc84.Text = lce52 and "✕ Fechar" or "⚙ Painel"
 end)
-local lPf = UserInputService.InputBegan:Connect(function(input, gp)
-if gp or not lbH3b(lbc1c) then return end
-if input.KeyCode == Enum.KeyCode.W then lci56.currentDir = _0(58,{128,172,159,168,174,159}); lD3(_0(58,{128,172,159,168,174,159}))
-elseif input.KeyCode == Enum.KeyCode.S then lci56.currentDir = _0(59,{141,160}); lD3(_0(59,{141,160}))
-elseif input.KeyCode == Enum.KeyCode.A then lcQ78.isA = true
-elseif input.KeyCode == Enum.KeyCode.D then lcQ78.isD = true end
+local lQ10 = UserInputService.InputBegan:Connect(function(input, gp)
+if gp or not lbI3c(lbd1d) then return end
+if input.KeyCode == Enum.KeyCode.W then lcj57.currentDir = _0(22,{92,136,123,132,138,123}); lD3(_0(22,{92,136,123,132,138,123}))
+elseif input.KeyCode == Enum.KeyCode.S then lcj57.currentDir = _0(41,{123,142}); lD3(_0(41,{123,142}))
+elseif input.KeyCode == Enum.KeyCode.A then lcT7b.isA = true
+elseif input.KeyCode == Enum.KeyCode.D then lcT7b.isD = true end
 end)
-table.insert(lT13, lPf)
-local lQ10 = UserInputService.InputEnded:Connect(function(input, gp)
+table.insert(lU14, lQ10)
+local lR11 = UserInputService.InputEnded:Connect(function(input, gp)
 if gp then return end
 if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.S then
-lci56.currentDir = _0(31,{111,128,145,128,145}); lD3(_0(31,{111,128,145,128,145}))
-elseif input.KeyCode == Enum.KeyCode.A then lcQ78.isA = false
-elseif input.KeyCode == Enum.KeyCode.D then lcQ78.isD = false end
+lcj57.currentDir = _0(56,{136,153,170,153,170}); lD3(_0(56,{136,153,170,153,170}))
+elseif input.KeyCode == Enum.KeyCode.A then lcT7b.isA = false
+elseif input.KeyCode == Enum.KeyCode.D then lcT7b.isD = false end
 end)
-table.insert(lT13, lQ10)
-local ldg88 = 0
-local ldk8c = false
-local lR11 = RunService.RenderStepped:Connect(function(deltaTime)
-ldg88 = ldg88 + deltaTime
-if ldg88 >= 0.75 then
-ldg88 = 0
-local lbt2d = lbp29()
-if lbt2d ~= lbc1c then
-lbc1c = lbt2d
-lbj23 = { front = nil, rear = nil }
-for _, ref in pairs(lcF6d) do ref.setToggle(false) end
+table.insert(lU14, lR11)
+local ldj8b = 0
+local ldn8f = false
+local lS12 = RunService.RenderStepped:Connect(function(deltaTime)
+ldj8b = ldj8b + deltaTime
+if ldj8b >= 0.75 then
+ldj8b = 0
+local lbu2e = lbq2a()
+if lbu2e ~= lbd1d then
+lbd1d = lbu2e
+lbk24 = { front = nil, rear = nil }
+for _, ref in pairs(lcI70) do ref.setToggle(false) end
 end
 end
-local lbD37 = lbH3b(lbc1c)
-if ldk8c and not lbD37 then
-lcQ78.isA = false; lcQ78.isD = false
-if lci56.enabled then lD3(_0(31,{111,128,145,128,145})) end
+local lbE38 = lbI3c(lbd1d)
+if ldn8f and not lbE38 then
+lcT7b.isA = false; lcT7b.isD = false
+if lcj57.enabled then lD3(_0(56,{136,153,170,153,170})) end
 end
-ldk8c = lbD37
-if lcQ78.enabled and lbc1c then
-local lcO76 = 0
-if lbD37 then
-if lcQ78.isA and not lcQ78.isD then lcO76 = -1
-elseif lcQ78.isD and not lcQ78.isA then lcO76 = 1 end
+ldn8f = lbE38
+if lcT7b.enabled and lbd1d then
+local lcR79 = 0
+if lbE38 then
+if lcT7b.isA and not lcT7b.isD then lcR79 = -1
+elseif lcT7b.isD and not lcT7b.isA then lcR79 = 1 end
 end
-local lcJ71 = 0
-if lcQ78.autoAlign and lbD37 then
-local lcA68 = lbc1c:FindFirstChild("DriveSeat") or lbc1c.PrimaryPart or lbc1c:FindFirstChildWhichIsA("BasePart", true)
-if lcA68 then
-local ldh89 = lcA68.AssemblyLinearVelocity
-if ldh89.Magnitude > 5 then
-local lbK3e = lcA68.CFrame:VectorToObjectSpace(ldh89)
-lcJ71 = math.atan2(lbK3e.X, -lbK3e.Z)
-lcJ71 = math.clamp(lcJ71, -lcQ78.maxAngle, lcQ78.maxAngle)
+local lcM74 = 0
+if lcT7b.autoAlign and lbE38 then
+local lcD6b = lbd1d:FindFirstChild("DriveSeat") or lbd1d.PrimaryPart or lbd1d:FindFirstChildWhichIsA("BasePart", true)
+if lcD6b then
+local ldk8c = lcD6b.AssemblyLinearVelocity
+if ldk8c.Magnitude > 5 then
+local lbL3f = lcD6b.CFrame:VectorToObjectSpace(ldk8c)
+lcM74 = math.atan2(lbL3f.X, -lbL3f.Z)
+lcM74 = math.clamp(lcM74, -lcT7b.maxAngle, lcT7b.maxAngle)
 end
 end
 end
-if lcO76 ~= 0 then
-lcQ78.currentSteer = math.clamp(lcQ78.currentSteer + (lcO76 * lcQ78.speed * deltaTime), -lcQ78.maxAngle, lcQ78.maxAngle)
+if lcR79 ~= 0 then
+lcT7b.currentSteer = math.clamp(lcT7b.currentSteer + (lcR79 * lcT7b.speed * deltaTime), -lcT7b.maxAngle, lcT7b.maxAngle)
 else
-local lcU7c = (lcQ78.autoAlign and lbD37) and lcJ71 or 0
-if lcQ78.currentSteer < lcU7c then
-lcQ78.currentSteer = math.min(lcU7c, lcQ78.currentSteer + (lcQ78.speed * deltaTime))
-elseif lcQ78.currentSteer > lcU7c then
-lcQ78.currentSteer = math.max(lcU7c, lcQ78.currentSteer - (lcQ78.speed * deltaTime))
+local lcX7f = (lcT7b.autoAlign and lbE38) and lcM74 or 0
+if lcT7b.currentSteer < lcX7f then
+lcT7b.currentSteer = math.min(lcX7f, lcT7b.currentSteer + (lcT7b.speed * deltaTime))
+elseif lcT7b.currentSteer > lcX7f then
+lcT7b.currentSteer = math.max(lcX7f, lcT7b.currentSteer - (lcT7b.speed * deltaTime))
 end
 end
-local ldl8d = { lbc1c:FindFirstChild("FR"), lbc1c:FindFirstChild("FL") }
-for _, wheel in pairs(ldl8d) do
+local ldo90 = { lbd1d:FindFirstChild("FR"), lbd1d:FindFirstChild("FL") }
+for _, wheel in pairs(ldo90) do
 if wheel then
 local lH7 = wheel:FindFirstChild("Axel")
 if lH7 then
 local lG6 = lH7:FindFirstChild("Attachment0")
-if lG6 then lG6.Axis = Vector3.new(lG6.Axis.X, lG6.Axis.Y, lcQ78.currentSteer) end
+if lG6 then lG6.Axis = Vector3.new(lG6.Axis.X, lG6.Axis.Y, lcT7b.currentSteer) end
 end
 end
 end
