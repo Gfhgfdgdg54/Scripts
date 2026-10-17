@@ -1,0 +1,1463 @@
+--[[
+    Mouse Steering (BeamNG style) - Car Dealership Tycoon  (v6)
+    J = toggle mouse steering (also runs "fixcam")
+    I = open/close settings menu (Smooth, Sensitivity, Apply)
+
+    - Cursor X position = steering (screen center = straight). Up/down is ignored.
+    - Steering is sent as A/D pulses, so it behaves like an analog joystick.
+    - HOLD RIGHT CLICK to look around, SCROLL to zoom.
+    - Running the script again removes the previous copy automatically.
+
+    After executing, choose your platform:
+      PC     = the keyboard + mouse controls above (J, X, I, N).
+      Mobile = on-screen steering wheel + a "Menus" button that opens both menus.
+               One finger drags the camera, two fingers pinch to zoom.
+               Gas / Brake buttons bottom-right. "Move" lets you drag the wheel and pedals
+               anywhere, "Lock" fixes them. The wheel stays where you leave it.
+]]
+
+-- ======== remove previous copy (so nothing overlaps) ========
+local env = (getgenv and getgenv()) or _G
+if env.MouseSteerCleanup then
+    pcall(env.MouseSteerCleanup)
+    env.MouseSteerCleanup = nil
+end
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local VIM = game:GetService("VirtualInputManager")
+local CoreGui = game:GetService("CoreGui")
+
+local player = Players.LocalPlayer
+local mmr = mousemoverel -- executor function (nil if unsupported)
+
+-- ================= SETTINGS =================
+local TOGGLE_KEY = Enum.KeyCode.J
+local MENU_KEY = Enum.KeyCode.I
+local GMENU_KEY = Enum.KeyCode.N
+local STEER_KEY = Enum.KeyCode.X   -- pause / resume mouse steering only
+
+-- Editable in the menu (kept between re-executions)
+env.MouseSteerSettings = env.MouseSteerSettings or { smooth = 0, sensitivity = 1 }
+local settings = env.MouseSteerSettings
+settings.maxAngle = settings.maxAngle or 0.4
+settings.wheelSize = settings.wheelSize or 140
+-- wheelSize: diameter in pixels of the on-screen steering wheel (mobile only, 80 - 260)
+settings.pedalSize = settings.pedalSize or 90
+settings.wheelPos = settings.wheelPos or { x = 0.14, y = 0.72 }
+settings.gasPos = settings.gasPos or { x = 0.92, y = 0.78 }
+settings.brakePos = settings.brakePos or { x = 0.78, y = 0.78 }
+settings.menuBtnPos = settings.menuBtnPos or { x = 0.93, y = 0.10 }
+settings.moveBtnPos = settings.moveBtnPos or { x = 0.93, y = 0.20 }
+-- pedalSize: width in pixels of the Gas / Brake buttons (mobile only, 60 - 180)
+-- wheelPos / gasPos / brakePos: where the controls sit, as a fraction of the screen (set by dragging)
+settings.gforce = settings.gforce or 1
+settings.fovMin = settings.fovMin or 70
+settings.fovMax = settings.fovMax or 90
+settings.swingMax = settings.swingMax or 35
+settings.swingSpeed = settings.swingSpeed or 10
+settings.returnSpeed = settings.returnSpeed or 2.5
+-- swingSpeed: how fast the camera swings out when a drift starts (higher = faster)
+-- returnSpeed: how fast the camera swings back when the drift ends (higher = faster)
+-- gforce: strength of the G-force camera (0 = off, 1 = normal, 2 = extreme)
+-- fovMin / fovMax: field of view when slow/stopped and at max speed/acceleration/drift
+-- swingMax: max angle (degrees) the camera swings around the car while drifting
+-- maxAngle: how far the front wheels turn at full steering (0.4 is what the game's own steering uses)
+-- smooth: 0 = instant, higher = smoother/slower (try 0 - 10)
+-- sensitivity: higher = less cursor travel needed for full steering (try 0.3 - 4)
+
+local BASE_RANGE = 0.30        -- fraction of screen width from center to full lock at sensitivity 1
+local CURSOR_PULL = 0.7        -- how strongly the cursor is kept inside the steering range
+local DEADZONE = 0.03
+local MAX_STEER = 1
+local HOLD_THRESHOLD = 0.9     -- at/above this the key is held down fully
+
+local FALLBACK_SENS = 0.0025   -- fallback mode (no mousemoverel): steering per pixel
+local DELTA_FILTER = 30
+
+-- Camera
+local CAMERA_SENS = 0.25
+local ZOOM_STEP = 3
+local MIN_ZOOM, MAX_ZOOM = 6, 80
+local CAM_HEIGHT = 2
+
+local SHOW_BAR = true
+-- ============================================
+
+local enabled = false
+local steerPaused = false     -- X key: mouse steering off, camera effects stay on
+local menuOpen = false        -- true while ANY menu is open
+local mainOpen, gOpen = false, false
+local targetSteer = 0
+local currentSteer = 0
+local filteredDx = 0
+local pwmAcc = 0
+local lastDir = 0
+local aDown, dDown = false, false
+local connection, wheelConn
+local rmbHeld = false
+local fixing = false
+local expectedX = nil
+local wasLook = false
+local barGui, barMarker
+local menuGui, gMenuGui
+
+-- platform chooser / mobile controls
+local platform = nil             -- "pc" or "mobile" (chosen right after executing)
+local pickerGui, mobileUI
+local applyControlSizes
+local wheelTouch, wheelRot, wheelLastAng = nil, 0, 0
+local mobLookDx, mobLookDy = 0, 0
+local pinchStart, pinchActive = nil, false
+local moveMode = false         -- true while the on-screen controls are being dragged around
+local gasTouch, brakeTouch = nil, nil
+local wDown, sDown, lastThr = false, false, 0
+local WHEEL_MAX = math.rad(100)  -- wheel rotation (each side) that gives full lock
+
+local conns = {}
+local function track(c)
+    table.insert(conns, c)
+    return c
+end
+
+local camInit = false
+local camYaw, camPitch, camDist = 0, math.rad(15), 20
+
+-- G-force camera state
+local gLat, gFwd, slipS, gSpeed, gLastVel = 0, 0, 0, 0, nil
+local fovS = 70
+
+local function getSeat()
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local seat = hum and hum.SeatPart
+    if seat and seat:IsA("BasePart") then
+        return seat
+    end
+    return nil
+end
+
+-- ---------- direct wheel steering (same method the game uses: FR/FL Axel.Attachment0.Axis) ----------
+local currentCar = nil
+local baseAxes = {}
+local directOn = false
+local steerOut = 0
+local stepConn
+
+local function carFromSeat(seat)
+    local cars = workspace:FindFirstChild("Cars")
+    local m = seat
+    while m and m.Parent do
+        if cars and m.Parent == cars then return m end
+        m = m.Parent
+    end
+    return nil
+end
+
+-- value is the wheel steering angle value (negative = left, positive = right). Returns true if wheels were found.
+local function applyAxis(value)
+    if not currentCar or not currentCar.Parent then return false end
+    local applied = false
+    for _, name in ipairs({ "FR", "FL" }) do
+        local wheel = currentCar:FindFirstChild(name)
+        local axel = wheel and wheel:FindFirstChild("Axel")
+        local att = axel and axel:FindFirstChild("Attachment0")
+        if att then
+            local base = baseAxes[att]
+            if not base then
+                local a = att.Axis
+                base = Vector3.new(a.X, a.Y, 0)
+                baseAxes[att] = base
+            end
+            att.Axis = Vector3.new(base.X, base.Y, value)
+            applied = true
+        end
+    end
+    return applied
+end
+
+local function notify(text)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Mouse Steering",
+            Text = text,
+            Duration = 2,
+        })
+    end)
+end
+
+local function makeGui(name)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = name
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 999
+    pcall(function()
+        if gethui then gui.Parent = gethui() else gui.Parent = CoreGui end
+    end)
+    if not gui.Parent then
+        gui.Parent = player:WaitForChild("PlayerGui")
+    end
+    return gui
+end
+
+-- ---------- steering bar ----------
+local function createBar()
+    if not SHOW_BAR or barGui then return end
+    local gui = makeGui("MouseSteerBar")
+
+    local back = Instance.new("Frame")
+    back.AnchorPoint = Vector2.new(0.5, 1)
+    back.Position = UDim2.new(0.5, 0, 1, -40)
+    back.Size = UDim2.new(0, 300, 0, 8)
+    back.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    back.BackgroundTransparency = 0.35
+    back.BorderSizePixel = 0
+    back.Parent = gui
+    Instance.new("UICorner", back).CornerRadius = UDim.new(1, 0)
+
+    local mid = Instance.new("Frame")
+    mid.AnchorPoint = Vector2.new(0.5, 0.5)
+    mid.Position = UDim2.new(0.5, 0, 0.5, 0)
+    mid.Size = UDim2.new(0, 2, 1, 6)
+    mid.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    mid.BackgroundTransparency = 0.4
+    mid.BorderSizePixel = 0
+    mid.Parent = back
+
+    local marker = Instance.new("Frame")
+    marker.AnchorPoint = Vector2.new(0.5, 0.5)
+    marker.Position = UDim2.new(0.5, 0, 0.5, 0)
+    marker.Size = UDim2.new(0, 14, 0, 14)
+    marker.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+    marker.BorderSizePixel = 0
+    marker.Parent = back
+    Instance.new("UICorner", marker).CornerRadius = UDim.new(1, 0)
+
+    barGui, barMarker = gui, marker
+end
+
+local function destroyBar()
+    if barGui then
+        barGui:Destroy()
+        barGui, barMarker = nil, nil
+    end
+end
+
+-- ---------- settings menu ----------
+local function createMenu()
+    local gui = makeGui("MouseSteerMenu")
+    gui.Enabled = false
+
+    local frame = Instance.new("Frame")
+    frame.AnchorPoint = Vector2.new(0.5, 0.5)
+    frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    frame.Size = UDim2.new(0, 280, 0, 395)
+    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = gui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+    local function label(text, y, size)
+        local l = Instance.new("TextLabel")
+        l.BackgroundTransparency = 1
+        l.Position = UDim2.new(0, 16, 0, y)
+        l.Size = UDim2.new(1, -32, 0, 18)
+        l.Font = Enum.Font.GothamMedium
+        l.TextSize = size or 13
+        l.TextColor3 = Color3.fromRGB(230, 230, 235)
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.Text = text
+        l.Parent = frame
+        return l
+    end
+
+    local function box(y, value)
+        local b = Instance.new("TextBox")
+        b.Position = UDim2.new(0, 16, 0, y)
+        b.Size = UDim2.new(1, -32, 0, 28)
+        b.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.Gotham
+        b.TextSize = 14
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.Text = tostring(value)
+        b.ClearTextOnFocus = false
+        b.Parent = frame
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+        return b
+    end
+
+    local title = label("Mouse Steering", 10, 16)
+    title.Font = Enum.Font.GothamBold
+
+    local close = Instance.new("TextButton")
+    close.Position = UDim2.new(1, -34, 0, 8)
+    close.Size = UDim2.new(0, 24, 0, 24)
+    close.BackgroundTransparency = 1
+    close.Font = Enum.Font.GothamBold
+    close.TextSize = 16
+    close.TextColor3 = Color3.fromRGB(200, 200, 205)
+    close.Text = "X"
+    close.Parent = frame
+
+    label("Smooth (0 = instant, 10 = very smooth)", 42)
+    local smoothBox = box(62, settings.smooth)
+
+    label("Sensitivity (higher = less mouse travel)", 98)
+    local sensBox = box(118, settings.sensitivity)
+
+    label("Max wheel angle (game default 0.4)", 154)
+    local angleBox = box(174, settings.maxAngle)
+
+    label("Wheel size (mobile, 80 - 260)", 210)
+    local sizeBox = box(230, settings.wheelSize)
+
+    label("Pedal size (mobile, 60 - 180)", 266)
+    local pedalBox = box(286, settings.pedalSize)
+
+    local apply = Instance.new("TextButton")
+    apply.Position = UDim2.new(0, 16, 0, 328)
+    apply.Size = UDim2.new(1, -32, 0, 32)
+    apply.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    apply.BorderSizePixel = 0
+    apply.Font = Enum.Font.GothamBold
+    apply.TextSize = 14
+    apply.TextColor3 = Color3.fromRGB(20, 20, 20)
+    apply.Text = "Apply"
+    apply.Parent = frame
+    Instance.new("UICorner", apply).CornerRadius = UDim.new(0, 6)
+
+    local status = label("", 364, 11)
+    status.TextColor3 = Color3.fromRGB(150, 220, 150)
+
+    local function setMenu(open)
+        mainOpen = open
+        menuOpen = mainOpen or gOpen
+        gui.Enabled = open
+        if open then
+            smoothBox.Text = tostring(settings.smooth)
+            sensBox.Text = tostring(settings.sensitivity)
+            angleBox.Text = tostring(settings.maxAngle)
+            sizeBox.Text = tostring(settings.wheelSize)
+            pedalBox.Text = tostring(settings.pedalSize)
+            status.Text = ""
+        else
+            expectedX = nil
+        end
+    end
+
+    track(apply.MouseButton1Click:Connect(function()
+        local s = tonumber(smoothBox.Text)
+        local v = tonumber(sensBox.Text)
+        local g = tonumber(angleBox.Text)
+        local ws = tonumber(sizeBox.Text)
+        local ps = tonumber(pedalBox.Text)
+        if not s or not v or not g or not ws or not ps then
+            status.TextColor3 = Color3.fromRGB(240, 120, 120)
+            status.Text = "Enter valid numbers"
+            return
+        end
+        settings.smooth = math.clamp(s, 0, 10)
+        settings.sensitivity = math.clamp(v, 0.1, 10)
+        settings.maxAngle = math.clamp(g, 0.05, 1.5)
+        settings.wheelSize = math.clamp(ws, 80, 260)
+        settings.pedalSize = math.clamp(ps, 60, 180)
+        if applyControlSizes then applyControlSizes() end
+        smoothBox.Text = tostring(settings.smooth)
+        sensBox.Text = tostring(settings.sensitivity)
+        angleBox.Text = tostring(settings.maxAngle)
+        sizeBox.Text = tostring(settings.wheelSize)
+        pedalBox.Text = tostring(settings.pedalSize)
+        status.TextColor3 = Color3.fromRGB(150, 220, 150)
+        status.Text = "Applied"
+    end))
+
+    track(close.MouseButton1Click:Connect(function()
+        setMenu(false)
+    end))
+
+    menuGui = { gui = gui, set = setMenu, frame = frame }
+end
+
+-- ---------- G-force camera menu (N) ----------
+local function createGMenu()
+    local gui = makeGui("MouseSteerGForceMenu")
+    gui.Enabled = false
+
+    local frame = Instance.new("Frame")
+    frame.AnchorPoint = Vector2.new(0.5, 0.5)
+    frame.Position = UDim2.new(0.5, 310, 0.5, 0)
+    frame.Size = UDim2.new(0, 280, 0, 445)
+    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = gui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+    local function label(text, y, size)
+        local l = Instance.new("TextLabel")
+        l.BackgroundTransparency = 1
+        l.Position = UDim2.new(0, 16, 0, y)
+        l.Size = UDim2.new(1, -32, 0, 18)
+        l.Font = Enum.Font.GothamMedium
+        l.TextSize = size or 13
+        l.TextColor3 = Color3.fromRGB(230, 230, 235)
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.Text = text
+        l.Parent = frame
+        return l
+    end
+
+    local function box(y, value)
+        local b = Instance.new("TextBox")
+        b.Position = UDim2.new(0, 16, 0, y)
+        b.Size = UDim2.new(1, -32, 0, 28)
+        b.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.Gotham
+        b.TextSize = 14
+        b.TextColor3 = Color3.fromRGB(255, 255, 255)
+        b.Text = tostring(value)
+        b.ClearTextOnFocus = false
+        b.Parent = frame
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+        return b
+    end
+
+    local title = label("G-Force Camera", 10, 16)
+    title.Font = Enum.Font.GothamBold
+
+    local close = Instance.new("TextButton")
+    close.Position = UDim2.new(1, -34, 0, 8)
+    close.Size = UDim2.new(0, 24, 0, 24)
+    close.BackgroundTransparency = 1
+    close.Font = Enum.Font.GothamBold
+    close.TextSize = 16
+    close.TextColor3 = Color3.fromRGB(200, 200, 205)
+    close.Text = "X"
+    close.Parent = frame
+
+    label("Strength (0 = off, 1 = normal)", 42)
+    local strengthBox = box(62, settings.gforce)
+
+    label("Min FOV (slow / stopped)", 98)
+    local fovMinBox = box(118, settings.fovMin)
+
+    label("Max FOV (fast / accelerating)", 154)
+    local fovMaxBox = box(174, settings.fovMax)
+
+    label("Max swing angle when drifting (degrees)", 210)
+    local swingBox = box(230, settings.swingMax)
+
+    label("Camera swing speed (higher = faster)", 266)
+    local swingSpeedBox = box(286, settings.swingSpeed)
+
+    label("Camera return speed (higher = faster)", 322)
+    local returnSpeedBox = box(342, settings.returnSpeed)
+
+    local apply = Instance.new("TextButton")
+    apply.Position = UDim2.new(0, 16, 0, 384)
+    apply.Size = UDim2.new(1, -32, 0, 32)
+    apply.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    apply.BorderSizePixel = 0
+    apply.Font = Enum.Font.GothamBold
+    apply.TextSize = 14
+    apply.TextColor3 = Color3.fromRGB(20, 20, 20)
+    apply.Text = "Apply"
+    apply.Parent = frame
+    Instance.new("UICorner", apply).CornerRadius = UDim.new(0, 6)
+
+    local status = label("", 420, 11)
+    status.TextColor3 = Color3.fromRGB(150, 220, 150)
+
+    local function setMenu(open)
+        gOpen = open
+        menuOpen = mainOpen or gOpen
+        gui.Enabled = open
+        if open then
+            strengthBox.Text = tostring(settings.gforce)
+            fovMinBox.Text = tostring(settings.fovMin)
+            fovMaxBox.Text = tostring(settings.fovMax)
+            swingBox.Text = tostring(settings.swingMax)
+            swingSpeedBox.Text = tostring(settings.swingSpeed)
+            returnSpeedBox.Text = tostring(settings.returnSpeed)
+            status.Text = ""
+        else
+            expectedX = nil
+        end
+    end
+
+    track(apply.MouseButton1Click:Connect(function()
+        local st = tonumber(strengthBox.Text)
+        local fmin = tonumber(fovMinBox.Text)
+        local fmax = tonumber(fovMaxBox.Text)
+        local sw = tonumber(swingBox.Text)
+        local ss = tonumber(swingSpeedBox.Text)
+        local rs = tonumber(returnSpeedBox.Text)
+        if not st or not fmin or not fmax or not sw or not ss or not rs then
+            status.TextColor3 = Color3.fromRGB(240, 120, 120)
+            status.Text = "Enter valid numbers"
+            return
+        end
+        settings.gforce = math.clamp(st, 0, 3)
+        settings.fovMin = math.clamp(fmin, 30, 120)
+        settings.fovMax = math.clamp(fmax, settings.fovMin, 120)
+        settings.swingMax = math.clamp(sw, 0, 90)
+        settings.swingSpeed = math.clamp(ss, 0.1, 30)
+        settings.returnSpeed = math.clamp(rs, 0.1, 30)
+        strengthBox.Text = tostring(settings.gforce)
+        fovMinBox.Text = tostring(settings.fovMin)
+        fovMaxBox.Text = tostring(settings.fovMax)
+        swingBox.Text = tostring(settings.swingMax)
+        swingSpeedBox.Text = tostring(settings.swingSpeed)
+        returnSpeedBox.Text = tostring(settings.returnSpeed)
+        status.TextColor3 = Color3.fromRGB(150, 220, 150)
+        status.Text = "Applied"
+    end))
+
+    track(close.MouseButton1Click:Connect(function()
+        setMenu(false)
+    end))
+
+    gMenuGui = { gui = gui, set = setMenu, frame = frame }
+end
+
+-- ---------- fixcam ----------
+local function fixCam()
+    fixing = true
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        if cam then cam:Destroy() end
+    end)
+    task.wait(0.1)
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if cam then
+            cam.CameraSubject = hum
+            cam.CameraType = Enum.CameraType.Custom
+            cam.FieldOfView = 70
+        end
+    end)
+    camInit = false
+    fixing = false
+end
+
+-- ---------- keys ----------
+local function setKey(key, down)
+    pcall(function()
+        VIM:SendKeyEvent(down, key, false, game)
+    end)
+end
+
+local function setA(down)
+    if aDown ~= down then
+        aDown = down
+        setKey(Enum.KeyCode.A, down)
+    end
+end
+
+local function setD(down)
+    if dDown ~= down then
+        dDown = down
+        setKey(Enum.KeyCode.D, down)
+    end
+end
+
+local function setW(down)
+    if wDown ~= down then
+        wDown = down
+        setKey(Enum.KeyCode.W, down)
+    end
+end
+
+local function setS(down)
+    if sDown ~= down then
+        sDown = down
+        setKey(Enum.KeyCode.S, down)
+    end
+end
+
+local function releaseKeys()
+    setA(false)
+    setD(false)
+    setW(false)
+    setS(false)
+    pwmAcc = 0
+    lastDir = 0
+end
+
+-- ---------- camera ----------
+local function restoreCamera()
+    local cam = workspace.CurrentCamera
+    if cam and cam.CameraType == Enum.CameraType.Scriptable then
+        cam.CameraType = Enum.CameraType.Custom
+    end
+    if cam then cam.FieldOfView = 70 end
+    gLat, gFwd, slipS, gSpeed, gLastVel = 0, 0, 0, 0, nil
+    fovS = 70
+    camInit = false
+end
+
+-- Measures how hard the car is accelerating (G-force) and how sideways it is sliding (drift angle)
+local function updateGForce(seat, dt)
+    if dt <= 0 then return end
+    local vel = seat.AssemblyLinearVelocity
+
+    if gLastVel then
+        local acc = (vel - gLastVel) / dt
+        local localAcc = seat.CFrame:VectorToObjectSpace(acc)
+        local grav = workspace.Gravity
+        local latTarget = math.clamp(localAcc.X / grav, -3, 3)
+        local fwdTarget = math.clamp(-localAcc.Z / grav, -3, 3)
+        local a = 1 - math.exp(-6 * dt)
+        gLat = gLat + (latTarget - gLat) * a
+        gFwd = gFwd + (fwdTarget - gFwd) * a
+    end
+    gLastVel = vel
+
+    -- drift (slip) angle: angle between where the car points and where it is actually moving
+    local lv = seat.CFrame:VectorToObjectSpace(vel)
+    gSpeed = vel.Magnitude
+    local slipTarget = 0
+    local slipRate = settings.returnSpeed * 0.25 -- when nearly stopped the swing fades out slowly (no snapping back)
+    if gSpeed > 8 then
+        local ang = math.atan2(lv.X, -lv.Z) -- -pi..pi
+        if math.abs(ang) > 2.6 then
+            -- driving straight backwards: no drift swing
+            slipTarget = 0
+            slipRate = settings.returnSpeed
+        else
+            -- keep the swing through big drift angles and spins instead of dropping to 0
+            slipTarget = math.clamp(ang, -1.5, 1.5)
+            -- swings out quickly, returns slowly
+            slipRate = (math.abs(slipTarget) >= math.abs(slipS)) and settings.swingSpeed or settings.returnSpeed
+        end
+    end
+    slipS = slipS + (slipTarget - slipS) * (1 - math.exp(-slipRate * dt))
+
+    -- field of view goes from Min FOV (slow) to Max FOV (fast, accelerating, drifting)
+    local slipNorm = math.clamp(math.abs(slipS) / 0.8, 0, 1)
+    local t = math.clamp(math.clamp(gSpeed / 150, 0, 1) * 0.7 + math.clamp(gFwd, 0, 1) * 0.3 + slipNorm * 0.3, 0, 1)
+    if settings.gforce <= 0 then t = 0 end
+    local fovTarget = settings.fovMin + (settings.fovMax - settings.fovMin) * t
+    fovS = fovS + (fovTarget - fovS) * (1 - math.exp(-4 * dt))
+
+end
+
+local function initCamera(seat, cam)
+    local rel = seat.CFrame:PointToObjectSpace(cam.CFrame.Position) - Vector3.new(0, CAM_HEIGHT, 0)
+    local dist = rel.Magnitude
+    if dist < 1 then
+        camYaw, camPitch, camDist = 0, math.rad(15), 20
+    else
+        camDist = math.clamp(dist, MIN_ZOOM, MAX_ZOOM)
+        camPitch = math.asin(math.clamp(rel.Y / dist, -1, 1))
+        camYaw = math.atan2(rel.X, rel.Z)
+    end
+    camInit = true
+end
+
+local function updateCamera(seat, cam, lookDx, lookDy)
+    if not camInit then
+        initCamera(seat, cam)
+    end
+
+    camYaw = camYaw - math.rad(lookDx * CAMERA_SENS)
+    camPitch = math.clamp(camPitch + math.rad(lookDy * CAMERA_SENS), math.rad(-10), math.rad(80))
+
+    local s = settings.gforce
+
+    -- drift: the camera swings toward the direction the car is really travelling, up to "Max swing angle"
+    local swing = 0
+    if s > 0 then
+        swing = math.clamp(slipS / 0.8, -1, 1) * math.rad(settings.swingMax)
+    end
+    local yawEff = camYaw - swing
+
+    -- G-force: camera body-lags opposite to acceleration (leans out in corners, back on throttle)
+    local sway = Vector3.new(-gLat * 1.2 * s, 0, gFwd * 1.0 * s)
+
+    -- shake while drifting hard
+    local intensity = math.clamp((math.abs(slipS) - 0.2) * 2, 0, 1) * s
+    local n = tick() * 25
+    local shake = Vector3.new(math.noise(n, 0.5), math.noise(n, 7.5), 0) * 0.25 * intensity
+
+    local localPos = Vector3.new(
+        math.cos(camPitch) * math.sin(yawEff),
+        math.sin(camPitch),
+        math.cos(camPitch) * math.cos(yawEff)
+    ) * camDist + Vector3.new(0, CAM_HEIGHT, 0) + sway + shake
+
+    local worldPos = seat.CFrame:PointToWorldSpace(localPos)
+    local focus = seat.CFrame:PointToWorldSpace(Vector3.new(0, CAM_HEIGHT, 0))
+
+    cam.CameraType = Enum.CameraType.Scriptable
+    -- roll the camera into the corner with lateral G
+    cam.CFrame = CFrame.lookAt(worldPos, focus) * CFrame.Angles(0, 0, math.rad(-gLat * 3 * s))
+    cam.FieldOfView = fovS
+end
+
+-- ---------- mobile controls ----------
+local function touchAngle(pos)
+    local hit = mobileUI and mobileUI.hit
+    if not hit then return 0 end
+    local c = hit.AbsolutePosition + hit.AbsoluteSize / 2
+    return math.atan2(pos.X - c.X, -(pos.Y - c.Y)) -- 0 = straight up, clockwise positive
+end
+
+-- Lets a finger drag a frame around. The frame must use AnchorPoint 0.5,0.5; its position is
+-- kept as a fraction of the screen so it works with any screen size and any UIScale.
+-- threshold: pixels the finger must travel before dragging starts (so buttons can still be tapped).
+-- Returns a table whose "moved" field is true if the last touch turned into a drag.
+local function makeMoveable(frame, canMove, onDone, threshold)
+    local state = { moved = false }
+    local dragging, startIn, startCenter
+    threshold = threshold or 0
+    track(frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch and not dragging and canMove() then
+            dragging = input
+            state.moved = false
+            startIn = Vector2.new(input.Position.X, input.Position.Y)
+            startCenter = frame.AbsolutePosition + frame.AbsoluteSize / 2
+        end
+    end))
+    track(UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragging then
+            local d = Vector2.new(input.Position.X, input.Position.Y) - startIn
+            if not state.moved then
+                if d.Magnitude < threshold then return end
+                state.moved = true
+            end
+            local c = startCenter + d
+            local sz = frame.Parent.AbsoluteSize
+            if sz.X > 0 and sz.Y > 0 then
+                frame.Position = UDim2.new(math.clamp(c.X / sz.X, 0.04, 0.96), 0, math.clamp(c.Y / sz.Y, 0.04, 0.96), 0)
+            end
+        end
+    end))
+    track(UserInputService.InputEnded:Connect(function(input)
+        if dragging and input == dragging then
+            dragging = nil
+            if state.moved and onDone then onDone(frame.Position.X.Scale, frame.Position.Y.Scale) end
+        end
+    end))
+    return state
+end
+
+local function createMobileUI()
+    if mobileUI then return end
+    local gui = makeGui("MouseSteerMobile")
+    gui.IgnoreGuiInset = false -- keeps touch positions and GUI positions in the same space
+    gui.DisplayOrder = 1000
+
+    -- white outline shown on a control while "Move" mode is on
+    local function outline(parent, radius)
+        local o = Instance.new("Frame")
+        o.Name = "MoveOutline"
+        o.Size = UDim2.new(1, 0, 1, 0)
+        o.BackgroundTransparency = 1
+        o.Visible = false
+        o.Parent = parent
+        Instance.new("UICorner", o).CornerRadius = radius
+        local st = Instance.new("UIStroke")
+        st.Color = Color3.fromRGB(255, 255, 255)
+        st.Thickness = 2
+        st.Parent = o
+        return o
+    end
+
+    -- ===== steering wheel: "hit" stays still and catches the finger, "vis" is what turns =====
+    local hit = Instance.new("Frame")
+    hit.Name = "WheelHit"
+    hit.AnchorPoint = Vector2.new(0.5, 0.5)
+    hit.Position = UDim2.new(settings.wheelPos.x, 0, settings.wheelPos.y, 0)
+    hit.Size = UDim2.new(0, settings.wheelSize, 0, settings.wheelSize)
+    hit.BackgroundTransparency = 1
+    hit.Active = true
+    hit.Visible = false
+    hit.Parent = gui
+
+    local vis = Instance.new("Frame")
+    vis.AnchorPoint = Vector2.new(0.5, 0.5)
+    vis.Position = UDim2.new(0.5, 0, 0.5, 0)
+    vis.Size = UDim2.new(1, 0, 1, 0)
+    vis.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    vis.BackgroundTransparency = 0.4
+    vis.BorderSizePixel = 0
+    vis.Parent = hit
+    Instance.new("UICorner", vis).CornerRadius = UDim.new(1, 0)
+    local rim = Instance.new("UIStroke")
+    rim.Color = Color3.fromRGB(255, 150, 0)
+    rim.Thickness = 6
+    rim.Parent = vis
+
+    local function spoke(anchor, size)
+        local s = Instance.new("Frame")
+        s.AnchorPoint = anchor
+        s.Position = UDim2.new(0.5, 0, 0.5, 0)
+        s.Size = size
+        s.BackgroundColor3 = Color3.fromRGB(205, 205, 210)
+        s.BackgroundTransparency = 0.15
+        s.BorderSizePixel = 0
+        s.Parent = vis
+        Instance.new("UICorner", s).CornerRadius = UDim.new(1, 0)
+    end
+    spoke(Vector2.new(0.5, 0.5), UDim2.new(0.86, 0, 0.07, 0)) -- horizontal bar
+    spoke(Vector2.new(0.5, 0), UDim2.new(0.07, 0, 0.38, 0))   -- bar down to the bottom
+
+    local hub = Instance.new("Frame")
+    hub.AnchorPoint = Vector2.new(0.5, 0.5)
+    hub.Position = UDim2.new(0.5, 0, 0.5, 0)
+    hub.Size = UDim2.new(0.24, 0, 0.24, 0)
+    hub.BackgroundColor3 = Color3.fromRGB(40, 40, 46)
+    hub.BorderSizePixel = 0
+    hub.Parent = vis
+    Instance.new("UICorner", hub).CornerRadius = UDim.new(1, 0)
+    local hubRim = Instance.new("UIStroke")
+    hubRim.Color = Color3.fromRGB(255, 150, 0)
+    hubRim.Thickness = 3
+    hubRim.Parent = hub
+
+    -- orange mark at the top of the wheel so you can see how far it is turned
+    local mark = Instance.new("Frame")
+    mark.AnchorPoint = Vector2.new(0.5, 0)
+    mark.Position = UDim2.new(0.5, 0, 0, 4)
+    mark.Size = UDim2.new(0.057, 0, 0.13, 0)
+    mark.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+    mark.BorderSizePixel = 0
+    mark.Parent = vis
+    Instance.new("UICorner", mark).CornerRadius = UDim.new(1, 0)
+    local wheelOutline = outline(hit, UDim.new(1, 0))
+
+    -- ===== gas / brake =====
+    local function pedal(name, label, color, pos)
+        local p = Instance.new("Frame")
+        p.Name = name
+        p.AnchorPoint = Vector2.new(0.5, 0.5)
+        p.Position = UDim2.new(pos.x, 0, pos.y, 0)
+        p.Size = UDim2.new(0, settings.pedalSize, 0, settings.pedalSize * 1.35)
+        p.BackgroundColor3 = color
+        p.BackgroundTransparency = 0.45
+        p.BorderSizePixel = 0
+        p.Active = true
+        p.Visible = false
+        p.Parent = gui
+        Instance.new("UICorner", p).CornerRadius = UDim.new(0, 14)
+        local st = Instance.new("UIStroke")
+        st.Color = Color3.fromRGB(255, 255, 255)
+        st.Transparency = 0.5
+        st.Thickness = 3
+        st.Parent = p
+        local t = Instance.new("TextLabel")
+        t.BackgroundTransparency = 1
+        t.Size = UDim2.new(1, 0, 1, 0)
+        t.Font = Enum.Font.GothamBold
+        t.TextColor3 = Color3.fromRGB(255, 255, 255)
+        t.TextSize = 18
+        t.Text = label
+        t.Parent = p
+        return p, t, outline(p, UDim.new(0, 14))
+    end
+    local gas, gasText, gasOutline = pedal("Gas", "GAS", Color3.fromRGB(60, 190, 100), settings.gasPos)
+    local brake, brakeText, brakeOutline = pedal("Brake", "BRAKE", Color3.fromRGB(215, 70, 70), settings.brakePos)
+
+    track(hit.InputBegan:Connect(function(input)
+        if not moveMode and input.UserInputType == Enum.UserInputType.Touch and not wheelTouch then
+            wheelTouch = input
+            wheelLastAng = touchAngle(input.Position)
+        end
+    end))
+    track(gas.InputBegan:Connect(function(input)
+        if not moveMode and input.UserInputType == Enum.UserInputType.Touch and not gasTouch then
+            gasTouch = input
+            setW(true)
+        end
+    end))
+    track(brake.InputBegan:Connect(function(input)
+        if not moveMode and input.UserInputType == Enum.UserInputType.Touch and not brakeTouch then
+            brakeTouch = input
+            setS(true)
+        end
+    end))
+
+    local function canMove() return moveMode end
+    makeMoveable(hit, canMove, function(x, y) settings.wheelPos = { x = x, y = y } end)
+    makeMoveable(gas, canMove, function(x, y) settings.gasPos = { x = x, y = y } end)
+    makeMoveable(brake, canMove, function(x, y) settings.brakePos = { x = x, y = y } end)
+
+    -- ===== buttons: Menus (both menus) and Move / Lock =====
+    local function topButton(text, pos, height)
+        local b = Instance.new("TextButton")
+        b.AnchorPoint = Vector2.new(0.5, 0.5)
+        b.Position = UDim2.new(pos.x, 0, pos.y, 0)
+        b.Size = UDim2.new(0, 84, 0, height)
+        b.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 14
+        b.TextColor3 = Color3.fromRGB(20, 20, 20)
+        b.Text = text
+        b.Parent = gui
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+        return b
+    end
+    local menuBtn = topButton("Menus", settings.menuBtnPos, 36)
+    local moveBtn = topButton("Move", settings.moveBtnPos, 30)
+    moveBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+    moveBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    local hint = Instance.new("TextLabel")
+    hint.AnchorPoint = Vector2.new(0.5, 0)
+    hint.Position = UDim2.new(0.5, 0, 0, 12)
+    hint.Size = UDim2.new(0, 380, 0, 26)
+    hint.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    hint.BackgroundTransparency = 0.25
+    hint.BorderSizePixel = 0
+    hint.Font = Enum.Font.GothamMedium
+    hint.TextSize = 13
+    hint.TextColor3 = Color3.fromRGB(255, 255, 255)
+    hint.Text = "Drag the wheel and pedals where you want them, then press Lock"
+    hint.Visible = false
+    hint.Parent = gui
+    Instance.new("UICorner", hint).CornerRadius = UDim.new(0, 6)
+
+    local function setMove(on)
+        moveMode = on
+        moveBtn.Text = on and "Lock" or "Move"
+        moveBtn.BackgroundColor3 = on and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(45, 45, 52)
+        moveBtn.TextColor3 = on and Color3.fromRGB(20, 20, 20) or Color3.fromRGB(255, 255, 255)
+        hint.Visible = on
+        wheelOutline.Visible = on
+        gasOutline.Visible = on
+        brakeOutline.Visible = on
+        if on then
+            wheelTouch, gasTouch, brakeTouch = nil, nil, nil
+            setW(false)
+            setS(false)
+            if menuGui then menuGui.set(false) end
+            if gMenuGui then gMenuGui.set(false) end
+        end
+    end
+    -- hold and drag either button to move it; a quick tap still presses it
+    local menuDrag = makeMoveable(menuBtn, function() return true end, function(x, y)
+        settings.menuBtnPos = { x = x, y = y }
+    end, 8)
+    local moveDrag = makeMoveable(moveBtn, function() return true end, function(x, y)
+        settings.moveBtnPos = { x = x, y = y }
+    end, 8)
+
+    track(moveBtn.Activated:Connect(function()
+        if moveDrag.moved then return end
+        setMove(not moveMode)
+    end))
+    track(menuBtn.Activated:Connect(function()
+        if menuDrag.moved then return end
+        if moveMode then setMove(false) end
+        local open = not (mainOpen or gOpen)
+        if menuGui then menuGui.set(open) end
+        if gMenuGui then gMenuGui.set(open) end
+    end))
+
+    -- both menus: fit side by side on a small screen, and drag them with a finger
+    local vp = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or Vector2.new(800, 400)
+    local function fit(m, height, x)
+        if not (m and m.frame) then return end
+        local u = Instance.new("UIScale")
+        u.Scale = math.clamp((vp.Y - 24) / height, 0.45, 1)
+        u.Parent = m.frame
+        m.frame.Position = UDim2.new(x, 0, 0.5, 0)
+        m.frame.Draggable = false -- the built-in drag does not work with touch
+        makeMoveable(m.frame, function() return true end)
+    end
+    fit(menuGui, 395, 0.27)
+    fit(gMenuGui, 445, 0.73)
+
+    mobileUI = {
+        gui = gui, hit = hit, wheel = hit, vis = vis, rim = rim,
+        gas = gas, brake = brake, gasText = gasText, brakeText = brakeText,
+        setVisible = function(v)
+            hit.Visible = v
+            gas.Visible = v
+            brake.Visible = v
+        end,
+        pedals = function(g, b)
+            gas.BackgroundTransparency = g and 0.1 or 0.45
+            brake.BackgroundTransparency = b and 0.1 or 0.45
+        end,
+    }
+    applyControlSizes()
+end
+
+applyControlSizes = function()
+    if not mobileUI then return end
+    local w = math.clamp(settings.wheelSize, 80, 260)
+    mobileUI.hit.Size = UDim2.new(0, w, 0, w)
+    mobileUI.rim.Thickness = math.max(3, w * 0.043)
+    local p = math.clamp(settings.pedalSize, 60, 180)
+    mobileUI.gas.Size = UDim2.new(0, p, 0, p * 1.35)
+    mobileUI.brake.Size = UDim2.new(0, p, 0, p * 1.35)
+    local ts = math.clamp(p * 0.2, 12, 30)
+    mobileUI.gasText.TextSize = ts
+    mobileUI.brakeText.TextSize = ts
+end
+
+local function destroyMobileUI()
+    if mobileUI then
+        pcall(function() mobileUI.gui:Destroy() end)
+        mobileUI = nil
+    end
+    wheelTouch, gasTouch, brakeTouch, wheelRot = nil, nil, nil, 0
+    moveMode = false
+end
+
+-- ---------- start / stop ----------
+local function stop()
+    if connection then
+        connection:Disconnect()
+        connection = nil
+    end
+    if wheelConn then
+        wheelConn:Disconnect()
+        wheelConn = nil
+    end
+    if stepConn then
+        stepConn:Disconnect()
+        stepConn = nil
+    end
+    directOn = false
+    applyAxis(0)
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    UserInputService.MouseIconEnabled = true
+    releaseKeys()
+    restoreCamera()
+    destroyBar()
+    targetSteer, currentSteer, filteredDx = 0, 0, 0
+    expectedX = nil
+end
+
+local function start()
+    targetSteer, currentSteer, filteredDx, pwmAcc = 0, 0, 0, 0
+    camInit = false
+    expectedX = nil
+    wasLook = false
+    steerPaused = false
+    if platform ~= "mobile" then createBar() end
+
+    wheelConn = UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseWheel and not menuOpen then
+            camDist = math.clamp(camDist - input.Position.Z * ZOOM_STEP, MIN_ZOOM, MAX_ZOOM)
+        end
+    end)
+
+    -- also set the wheels right before every physics step so the game can't pull them back
+    stepConn = RunService.Stepped:Connect(function()
+        if directOn then
+            applyAxis(steerOut * settings.maxAngle)
+        end
+    end)
+
+    connection = RunService.RenderStepped:Connect(function(dt)
+        if fixing then return end
+
+        local seat = getSeat()
+        local cam = workspace.CurrentCamera
+
+        local car = seat and carFromSeat(seat) or nil
+        if car ~= currentCar then
+            if currentCar then applyAxis(0) end
+            currentCar = car
+            baseAxes = {}
+        end
+
+        if not seat then
+            directOn = false
+            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+            UserInputService.MouseIconEnabled = true
+            releaseKeys()
+            restoreCamera()
+            targetSteer, currentSteer, filteredDx = 0, 0, 0
+            expectedX = nil
+            if barMarker then barMarker.Position = UDim2.new(0.5, 0, 0.5, 0) end
+            if mobileUI then mobileUI.setVisible(moveMode and not menuOpen) end
+            wheelRot, wheelTouch, gasTouch, brakeTouch = 0, nil, nil, nil
+            return
+        end
+
+        updateGForce(seat, dt)
+
+        if mobileUI then
+            mobileUI.setVisible(not menuOpen)
+            mobileUI.vis.Rotation = math.deg(wheelRot)
+            if menuOpen or moveMode then
+                gasTouch, brakeTouch = nil, nil
+                setW(false)
+                setS(false)
+            end
+            mobileUI.pedals(wDown, sDown)
+            local thr = (wDown and 1 or 0) - (sDown and 1 or 0)
+            if thr ~= lastThr then
+                lastThr = thr
+                pcall(function()
+                    if seat:IsA("VehicleSeat") then seat.ThrottleFloat = thr end
+                end)
+            end
+        end
+
+        local lookMode = (not menuOpen) and (rmbHeld or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2))
+        local sens = math.max(settings.sensitivity, 0.05)
+
+        -- ===== input =====
+        if platform == "mobile" then
+            -- touch: the wheel steers and STAYS where you leave it; one finger drags the camera
+            local lx, ly = mobLookDx, mobLookDy
+            mobLookDx, mobLookDy = 0, 0
+            if cam then updateCamera(seat, cam, lx, ly) end
+            targetSteer = math.clamp(wheelRot / WHEEL_MAX * sens, -MAX_STEER, MAX_STEER)
+            expectedX = nil
+        elseif menuOpen then
+            -- menu open: free cursor, car goes straight
+            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+            UserInputService.MouseIconEnabled = true
+            if cam then updateCamera(seat, cam, 0, 0) end
+            targetSteer = 0
+            expectedX = nil
+        elseif steerPaused then
+            -- X pressed: mouse steering is off. Normal free cursor, normal A/D driving.
+            -- Right click still lets you look around.
+            if lookMode then
+                UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+                local delta = UserInputService:GetMouseDelta()
+                if cam then updateCamera(seat, cam, delta.X, delta.Y) end
+            else
+                UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+                UserInputService.MouseIconEnabled = true
+                if cam then updateCamera(seat, cam, 0, 0) end
+            end
+            targetSteer = 0
+            expectedX = nil
+        elseif mmr then
+            -- REAL CURSOR MODE
+            if lookMode then
+                UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+                local delta = UserInputService:GetMouseDelta()
+                if cam then updateCamera(seat, cam, delta.X, delta.Y) end
+                expectedX = nil
+                wasLook = true
+            else
+                UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+                UserInputService.MouseIconEnabled = true
+                if cam then updateCamera(seat, cam, 0, 0) end
+
+                local view = cam and cam.ViewportSize or Vector2.new(1920, 1080)
+                local cx = view.X / 2
+                local range = view.X * BASE_RANGE / sens
+                local m = UserInputService:GetMouseLocation()
+
+                if expectedX and not wasLook and math.abs(m.X - expectedX) > 1.5 then
+                    targetSteer = (m.X - cx) / range
+                end
+                wasLook = false
+
+                targetSteer = math.clamp(targetSteer, -MAX_STEER, MAX_STEER)
+
+                -- keep the cursor inside the steering range (horizontal only)
+                local desiredX = cx + targetSteer * range
+                local dxMove = (desiredX - m.X) * CURSOR_PULL
+                if math.abs(dxMove) >= 0.5 then
+                    pcall(mmr, dxMove, 0)
+                end
+                expectedX = m.X + dxMove
+            end
+        else
+            -- FALLBACK: locked mouse, delta steering
+            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+            local delta = UserInputService:GetMouseDelta()
+            if cam then
+                if lookMode then updateCamera(seat, cam, delta.X, delta.Y)
+                else updateCamera(seat, cam, 0, 0) end
+            end
+            local rawDx = lookMode and 0 or delta.X
+            filteredDx = filteredDx + (rawDx - filteredDx) * (1 - math.exp(-DELTA_FILTER * dt))
+            if not lookMode then
+                targetSteer = targetSteer + filteredDx * FALLBACK_SENS * sens
+            end
+            targetSteer = math.clamp(targetSteer, -MAX_STEER, MAX_STEER)
+        end
+
+        -- ===== smoothing (0 = instant) =====
+        if settings.smooth <= 0.001 then
+            currentSteer = targetSteer
+        else
+            local rate = 40 / settings.smooth
+            currentSteer = currentSteer + (targetSteer - currentSteer) * (1 - math.exp(-rate * dt))
+        end
+
+        local out = currentSteer
+        if steerPaused then
+            out = 0
+            currentSteer = 0
+        end
+        if math.abs(out) < DEADZONE then out = 0 end
+
+        if barMarker then
+            barMarker.Position = UDim2.new(0.5, out * 150, 0.5, 0)
+        end
+
+        pcall(function()
+            if seat:IsA("VehicleSeat") then
+                seat.SteerFloat = out
+            end
+        end)
+
+        -- ===== analog -> A/D pulses (joystick-like) =====
+        local dir = (out > 0 and 1) or (out < 0 and -1) or 0
+
+        -- Direct wheel steering: sets the wheel angle itself, so no A/D keys and no auto-return/lag
+        steerOut = out
+        directOn = (not steerPaused) and applyAxis(out * settings.maxAngle)
+
+        if directOn then
+            setA(false)
+            setD(false)
+            pwmAcc = 0
+            lastDir = 0
+        elseif dir == 0 then
+            setA(false)
+            setD(false)
+            pwmAcc = 0
+            lastDir = 0
+        else
+            if dir ~= lastDir then
+                pwmAcc = 1 -- press immediately when a turn starts (no delay)
+                lastDir = dir
+            end
+            local mag = math.abs(out)
+            if mag >= HOLD_THRESHOLD then
+                pwmAcc = 1
+                if dir > 0 then setA(false) setD(true) else setD(false) setA(true) end
+            else
+                pwmAcc = pwmAcc + mag
+                local press = false
+                if pwmAcc >= 1 then
+                    pwmAcc = pwmAcc - 1
+                    press = true
+                end
+                if dir > 0 then
+                    setA(false)
+                    setD(press)
+                else
+                    setD(false)
+                    setA(press)
+                end
+            end
+        end
+    end)
+end
+
+-- ---------- platform chooser ----------
+local function destroyPicker()
+    if pickerGui then
+        pcall(function() pickerGui:Destroy() end)
+        pickerGui = nil
+    end
+end
+
+local function startPC()
+    platform = "pc"
+    destroyPicker()
+    notify("Loaded. J = script, X = mouse steering on/off, I = settings, N = G-force camera.")
+end
+
+local function startMobile()
+    platform = "mobile"
+    destroyPicker()
+    createMobileUI()
+    enabled = true -- no J key on a phone, so it starts right away
+    task.spawn(function()
+        fixCam()
+        if enabled then
+            start()
+            notify("Mobile ON. Turn the wheel to steer, drag to look, pinch to zoom.")
+        end
+    end)
+end
+
+local function showPicker()
+    local gui = makeGui("MouseSteerPlatform")
+    pickerGui = gui
+    local touchOnly = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+    local frame = Instance.new("Frame")
+    frame.AnchorPoint = Vector2.new(0.5, 0.5)
+    frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    frame.Size = UDim2.new(0, 300, 0, 170)
+    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+    local function text(str, y, size, color, font)
+        local l = Instance.new("TextLabel")
+        l.BackgroundTransparency = 1
+        l.Position = UDim2.new(0, 0, 0, y)
+        l.Size = UDim2.new(1, 0, 0, size + 6)
+        l.Font = font or Enum.Font.GothamMedium
+        l.TextSize = size
+        l.TextColor3 = color
+        l.Text = str
+        l.Parent = frame
+    end
+    text("Choose platform", 14, 18, Color3.fromRGB(230, 230, 235), Enum.Font.GothamBold)
+    text(touchOnly and "Detected: mobile device" or "Detected: PC", 44, 12, Color3.fromRGB(150, 150, 160))
+
+    local function button(label, x, recommended, callback)
+        local b = Instance.new("TextButton")
+        b.AnchorPoint = Vector2.new(0.5, 0)
+        b.Position = UDim2.new(x, 0, 0, 82)
+        b.Size = UDim2.new(0, 120, 0, 64)
+        b.BackgroundColor3 = recommended and Color3.fromRGB(255, 150, 0) or Color3.fromRGB(45, 45, 52)
+        b.BorderSizePixel = 0
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 18
+        b.TextColor3 = recommended and Color3.fromRGB(20, 20, 20) or Color3.fromRGB(255, 255, 255)
+        b.Text = label
+        b.Parent = frame
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+        track(b.Activated:Connect(callback))
+    end
+    button("PC", 0.28, not touchOnly, startPC)
+    button("Mobile", 0.72, touchOnly, startMobile)
+end
+
+-- ---------- input handling ----------
+track(UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        rmbHeld = true
+    end
+    if gameProcessed then return end
+    if platform ~= "pc" then return end
+
+    if input.KeyCode == TOGGLE_KEY then
+        enabled = not enabled
+        if enabled then
+            task.spawn(function()
+                fixCam()
+                if enabled then
+                    start()
+                    if mmr then
+                        notify("Mouse steering ON. Cursor = wheel. I = settings.")
+                    else
+                        notify("ON (no mousemoverel: locked-mouse mode, watch the bar)")
+                    end
+                end
+            end)
+        else
+            stop()
+            task.spawn(fixCam)
+            notify("Mouse steering OFF")
+        end
+    elseif input.KeyCode == MENU_KEY then
+        if menuGui then
+            menuGui.set(not mainOpen)
+        end
+    elseif input.KeyCode == STEER_KEY then
+        if not enabled then
+            notify("Press J first to turn the script on")
+        else
+            steerPaused = not steerPaused
+            if steerPaused then
+                directOn = false
+                applyAxis(0) -- straighten the wheels once, then the game's own steering takes over
+                targetSteer, currentSteer, filteredDx = 0, 0, 0
+                releaseKeys()
+                notify("Mouse steering OFF (X to turn back on)")
+            else
+                expectedX = nil
+                notify("Mouse steering ON")
+            end
+        end
+    elseif input.KeyCode == GMENU_KEY then
+        if gMenuGui then
+            gMenuGui.set(not gOpen)
+        end
+    end
+end))
+
+track(UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        rmbHeld = false
+    end
+    if wheelTouch and input == wheelTouch then
+        wheelTouch = nil
+    end
+    if gasTouch and input == gasTouch then
+        gasTouch = nil
+        setW(false)
+    end
+    if brakeTouch and input == brakeTouch then
+        brakeTouch = nil
+        setS(false)
+    end
+end))
+
+-- mobile: finger on the wheel turns it, any other finger drags the camera
+track(UserInputService.InputChanged:Connect(function(input, gameProcessed)
+    if platform ~= "mobile" or input.UserInputType ~= Enum.UserInputType.Touch then return end
+    if wheelTouch and input == wheelTouch then
+        local ang = touchAngle(input.Position)
+        local d = (ang - wheelLastAng + math.pi) % (2 * math.pi) - math.pi
+        wheelLastAng = ang
+        wheelRot = math.clamp(wheelRot + d, -WHEEL_MAX, WHEEL_MAX)
+    elseif not gameProcessed and not menuOpen and not pinchActive then
+        mobLookDx = mobLookDx + input.Delta.X
+        mobLookDy = mobLookDy + input.Delta.Y
+    end
+end))
+
+-- mobile: pinch to zoom
+track(UserInputService.TouchPinch:Connect(function(positions, scale, velocity, state, gameProcessed)
+    if platform ~= "mobile" then return end
+    if state == Enum.UserInputState.Begin then
+        pinchActive = true
+        pinchStart = camDist
+    elseif state == Enum.UserInputState.Change then
+        if pinchStart and not gameProcessed and not menuOpen then
+            camDist = math.clamp(pinchStart / math.max(scale, 0.1), MIN_ZOOM, MAX_ZOOM)
+        end
+    else
+        pinchActive = false
+        pinchStart = nil
+    end
+end))
+
+createMenu()
+createGMenu()
+
+-- ---------- cleanup hook for re-execution ----------
+env.MouseSteerCleanup = function()
+    enabled = false
+    pcall(stop)
+    for _, c in ipairs(conns) do
+        pcall(function() c:Disconnect() end)
+    end
+    conns = {}
+    if menuGui and menuGui.gui then
+        pcall(function() menuGui.gui:Destroy() end)
+    end
+    if gMenuGui and gMenuGui.gui then
+        pcall(function() gMenuGui.gui:Destroy() end)
+    end
+    destroyBar()
+    destroyMobileUI()
+    destroyPicker()
+    releaseKeys()
+end
+
+showPicker()
